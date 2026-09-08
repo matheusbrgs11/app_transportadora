@@ -1,0 +1,39 @@
+package br.com.coleta.motorista
+
+import android.content.Context
+import android.content.ContentValues
+import android.database.sqlite.SQLiteOpenHelper
+import android.database.sqlite.SQLiteDatabase
+import org.json.JSONObject
+
+class Store(context: Context) : SQLiteOpenHelper(context, "coleta.db", null, 1) {
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE cache(owner TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+        db.execSQL("CREATE TABLE visits(id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL, error TEXT NOT NULL)")
+    }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { error("Migração não definida") }
+    fun cache(owner: String, payload: JSONObject) {
+        writableDatabase.insertWithOnConflict("cache", null, ContentValues().apply {
+            put("owner", owner); put("payload", payload.toString())
+        }, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+    fun cached(owner: String): JSONObject? = readableDatabase.rawQuery("SELECT payload FROM cache WHERE owner=?", arrayOf(owner)).use {
+        if (it.moveToFirst()) JSONObject(it.getString(0)) else null
+    }
+    fun save(owner: String, body: JSONObject) {
+        writableDatabase.insertOrThrow("visits", null, ContentValues().apply {
+            put("id", body.getString("id_local_dispositivo")); put("owner", owner)
+            put("payload", body.toString()); put("state", "pending"); put("error", "")
+        })
+    }
+    fun visits(owner: String): List<JSONObject> = readableDatabase.rawQuery(
+        "SELECT id,payload,state,error FROM visits WHERE owner=? ORDER BY rowid", arrayOf(owner)
+    ).use { cursor -> buildList {
+        while (cursor.moveToNext()) add(JSONObject().put("id",cursor.getString(0))
+            .put("body",JSONObject(cursor.getString(1))).put("state",cursor.getString(2)).put("error",cursor.getString(3)))
+    } }
+    fun state(owner: String, id: String, state: String, error: String = "") {
+        writableDatabase.update("visits", ContentValues().apply { put("state",state); put("error",error) },
+            "owner=? AND id=?", arrayOf(owner,id))
+    }
+}
