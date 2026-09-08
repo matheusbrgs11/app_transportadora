@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+if [[ -d ../.local/toolchains/jdk-17.0.20.1+1 ]]; then
+  source ../scripts/android-env.sh
+fi
 command -v java >/dev/null || { echo 'Falta JDK 17. Android Studio não é necessário.' >&2; exit 1; }
 command -v gradle >/dev/null || { echo 'Falta Gradle 8.11.1 no PATH.' >&2; exit 1; }
 if [[ -z "${ANDROID_HOME:-}" && ! -f local.properties ]]; then

@@ -1,6 +1,6 @@
 # Android — primeira implementação do motorista
 
-Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sistema. **Ainda não compilado nem homologado em aparelho.** A máquina de desenvolvimento não possui Java, Gradle ou SDK Android. Esta entrega não é um APK pronto nem encerra a fase 3.
+Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sistema. **APK debug compilado; homologação em aparelho pendente.** Java 17, Gradle 8.11.1 e SDK 35 foram configurados localmente em `.local/toolchains`, fora do Git. A compilação não encerra a fase 3.
 
 ## Fluxo implementado no código
 
@@ -23,7 +23,7 @@ Instale as ferramentas de linha de comando oficiais, configure `ANDROID_HOME` e 
 ./build-debug.sh
 ```
 
-O script compila e executa lint; o APK esperado é `app/build/outputs/apk/debug/app-debug.apk`. Não há Gradle Wrapper incluído nesta versão; o script usa Gradle instalado no PATH.
+Na máquina configurada, o script carrega automaticamente `scripts/android-env.sh`. Em outra máquina, instale as ferramentas e configure o ambiente. O script compila e executa lint; o APK esperado é `app/build/outputs/apk/debug/app-debug.apk`. Não há Gradle Wrapper incluído nesta versão; o script usa Gradle instalado no PATH.
 
 Com telefone conectado por USB, depuração autorizada e platform-tools instalados:
 
@@ -38,6 +38,6 @@ Reinicie o backend após atualizar o código para disponibilizar `/motorista/mod
 
 ## Verificações pendentes no Android
 
-Compilação/lint e teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Dados digitados e ainda não salvos não têm recuperação de rascunho.
+Teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Dados digitados e ainda não salvos não têm recuperação de rascunho.
 
 Ainda faltam sincronização automática em segundo plano, login offline após reiniciar, assinatura, não atendimento/cancelamento, reconciliação de rota alterada, deduplicação de uma mesma parada entre aparelhos, rastreamento e notificações. Uma rota alterada antes do primeiro envio gera conflito; a fila mantém o registro para conferência da operação. Não há ferramenta de resolução desse conflito nesta primeira versão.

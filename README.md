@@ -1,6 +1,6 @@
 # Coleta
 
-Painel React e backend FastAPI/PostgreSQL para clientes, motoristas, rotas, coletas e histórico de várias transportadoras. Desenvolvimento local, sem Docker. Primeira implementação Android em `android/`, ainda sem compilação/homologação; geocodificação pendente.
+Painel React e backend FastAPI/PostgreSQL para clientes, motoristas, rotas, coletas e histórico de várias transportadoras. Desenvolvimento local, sem Docker. Primeira implementação Android em `android/`, APK debug compilado, homologação em aparelho pendente; geocodificação pendente.
 
 ## Executar sem Docker
 
@@ -74,7 +74,7 @@ Retorna `data`, `fuso_horario`, dados básicos do próprio motorista/veículo, `
 
 Sem parâmetro, o dia é calculado no fuso da transportadora. `?data=2026-09-07` permite consultar o planejamento recorrente para um dia específico. Essa consulta usa o cadastro **atual** das rotas; não representa o histórico de como uma rota estava organizada no passado. Dias sem rota retornam uma lista vazia. A consulta não gera coletas, não registra visitas e não implementa sincronização offline.
 
-A primeira tela nativa e a fila local estão em [android/README.md](android/README.md), ainda sem compilação e teste em aparelho. `GET /motorista/modalidades` fornece modalidades ativas. `POST /motorista/coletas` registra visitas concluídas da própria rota: exige UUID local, rota/versão, cliente, data com fuso, itens e observações opcionais. Confere atribuição, dia da semana e pertencimento do cliente; mudanças na rota geram conflito. A rota/versão fica preservada no evento de criação. Reenvio idêntico retorna 200; alteração de conteúdo com o mesmo UUID retorna 409. O endpoint não conclui agendamentos existentes: cria um registro de visita separado, sem gerar automaticamente coletas da rota. Testes verificam ordem/janelas, domingo, fuso na virada do dia, rotas inativas, ausência de gravações e isolamento entre motoristas/empresas.
+A primeira tela nativa e a fila local estão em [android/README.md](android/README.md), com APK debug compilado e teste em aparelho pendente. `GET /motorista/modalidades` fornece modalidades ativas. `POST /motorista/coletas` registra visitas concluídas da própria rota: exige UUID local, rota/versão, cliente, data com fuso, itens e observações opcionais. Confere atribuição, dia da semana e pertencimento do cliente; mudanças na rota geram conflito. A rota/versão fica preservada no evento de criação. Reenvio idêntico retorna 200; alteração de conteúdo com o mesmo UUID retorna 409. O endpoint não conclui agendamentos existentes: cria um registro de visita separado, sem gerar automaticamente coletas da rota. Testes verificam ordem/janelas, domingo, fuso na virada do dia, rotas inativas, ausência de gravações e isolamento entre motoristas/empresas.
 
 ## Importação
 
@@ -133,3 +133,9 @@ Faltam assinaturas, Android offline e execução pelo motorista, geração de co
 Antes de publicar: HTTPS, recuperação de senha, backups, monitoramento, retenção/limpeza de prévias e sessões, limite de upload no proxy e limite de login compartilhado entre instâncias. O limitador atual é em memória, por IP, para uma instância de desenvolvimento.
 
 Referências: [FastAPI autenticação](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/), [Psycopg transações](https://www.psycopg.org/psycopg3/docs/basic/transactions.html), [Receita Federal: dígitos do CNPJ](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/documentos-tecnicos/cnpj/manual-dv-cnpj.pdf).
+
+## Prévia visual do motorista
+
+Abra http://127.0.0.1:5173/previa-motorista.html com o painel em execução, ou abra `frontend/public/previa-motorista.html` diretamente no navegador. A página é independente da API, usa apenas dados fictícios e permite simular login, registro de modalidades e envio pendente. Não é o APK executando: os controles nativos podem variar no Android. Os dados da prévia são descartados ao recarregar.
+
+Desenvolvimento pausado a pedido do usuário após esta prévia. Próxima etapa: homologação do APK em aparelho ou emulador.
