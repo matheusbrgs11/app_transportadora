@@ -10,14 +10,16 @@ class VisitSync(private val store: Store, private val owner: String,
         for (record in store.visits(owner).filter { it.getString("state") != "sent" }) {
             val id = record.getString("id")
             try {
-                val receipt = send(record.getJSONObject("body"))
+                val body = record.getJSONObject("body")
+                val receipt = send(body)
                 // Never acknowledge a redirect, empty response or malformed success as delivery.
                 java.util.UUID.fromString(receipt.getString("id"))
-                check(receipt.getString("status") == "concluida") { "Resposta de confirmação inválida. Registro preservado." }
+                if (!body.isNull("coleta_id")) check(receipt.getString("id") == body.getString("coleta_id")) { "Confirmação de outro atendimento. Registro preservado." }
+                check(receipt.getString("status") == body.optString("status", "concluida")) { "Resposta de confirmação inválida. Registro preservado." }
                 store.state(owner, id, "sent")
                 sent++
             } catch (e: ApiError) {
-                val conflict = e.status in listOf(403, 409, 422)
+                val conflict = e.status in listOf(403, 404, 409, 422)
                 store.state(owner, id, if (conflict) "conflict" else "pending", e.message ?: "Falha no envio")
                 if (!conflict) throw e
             } catch (e: Exception) {

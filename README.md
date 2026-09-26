@@ -149,6 +149,20 @@ Desenvolvimento retomado em 26/09/2026. Progresso e pendências em ROADMAP.md.
 
 Cada rota/data possui uma execução imutável com motorista, versão, endereços, ordem e janelas. Repetir a preparação devolve a mesma execução. O agendamento usa o início da janela ou 08:00 no fuso da empresa quando não há janela. As modalidades ficam a informar até a coleta; o painel também pode informá-las na conclusão.
 
-A conclusão pelo motorista mantém o ID do agendamento, acrescenta volumes e evento de auditoria. Reenvio idêntico é confirmado; outro aparelho tentando concluir uma visita já finalizada recebe 409. Atualizar a rota mostra o estado atual do servidor. Alterações no planejamento recorrente só afetam novas execuções; transferência de uma execução já emitida, feriados e revisitas explícitas continuam pendentes no ROADMAP.
+A conclusão pelo motorista mantém o ID do agendamento, acrescenta volumes e evento de auditoria. Reenvio idêntico é confirmado; outro aparelho tentando concluir uma visita já finalizada recebe 409. Atualizar a rota mostra o estado atual do servidor. Alterações no planejamento recorrente só afetam novas execuções; atendimentos pendentes podem ser transferidos individualmente, e feriados/dias extras e revisitas são tratados na operação diária.
 
-Compatibilidade: visitas antigas já registradas em uma rota/data bloqueiam nova geração nessa combinação para exigir conferência operacional. Registros antigos e filas existentes não são apagados. Não há conversão automática desses registros nem associação automática de agendamentos avulsos. Aplicar migração 005 antes de usar o APK atualizado (o servidor de desenvolvimento aplica migrações ao iniciar).
+Compatibilidade: visitas antigas já registradas em uma rota/data bloqueiam nova geração nessa combinação para exigir conferência operacional. Registros antigos e filas existentes não são apagados. Não há conversão automática desses registros nem associação automática de agendamentos avulsos. Aplicar migração 006 antes de usar o APK atualizado (o servidor de desenvolvimento aplica migrações ao iniciar).
+
+## Operação diária: exceções, transferências e revisitas
+
+No painel, abra **Rotas → Acompanhar operação do dia**. Escolha a data, consulte o andamento e prepare os atendimentos. **Atualizar andamento** consulta os estados atuais; não há atualização automática nesta entrega.
+
+Antes de emitir o dia, uma exceção pode suspender a operação (feriado/pausa) ou autorizar atendimento extra. Não há importação automática de calendário. Depois de emitir, use as ações individuais; a exceção não pode apagar uma execução existente. Alterações de exceção ficam em eventos append-only com usuário/data/motivo.
+
+Transferências exigem atendimento pendente, motorista ativo, versão atual e motivo. O ID é preservado e o evento registra os responsáveis anterior e novo. Não altera a escala recorrente. O novo motorista recebe o atendimento ao atualizar; a fila antiga do anterior é preservada como conflito se enviada após a transferência.
+
+Uma revisita é uma nova tentativa na **mesma data e execução**, autorizada pela operação após a anterior ser finalizada, com motivo e vínculo com a tentativa anterior. Repetir a mesma solicitação não duplica. Uma tentativa só tem uma sucessora; novas revisitas partem da tentativa mais recente. Para outro dia, prepare a execução correspondente. Registros anteriores nunca são reabertos ou apagados.
+
+O histórico administrativo expõe `tentativa` e `revisita_de`, e preserva eventos das intervenções. O motorista consulta apenas os próprios atendimentos por dia/semana, com paginação e sem dados comerciais dos clientes. O resumo inclui todas as tentativas, não clientes únicos.
+
+Endpoints adicionais: `GET /rotas/{id}/execucoes?data=...`, `PUT /rotas/{id}/excecoes/{data}`, `POST /coletas/{id}/transferir`, `POST /coletas/{id}/revisitas` e `GET /motorista/historico`. O OpenAPI local documenta os campos. Migração 006 aplicada pelo iniciador local; nenhuma migração em Supabase foi executada.

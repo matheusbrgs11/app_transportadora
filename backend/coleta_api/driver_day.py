@@ -1,7 +1,8 @@
 """Consulta operacional do motorista, restrita ao próprio usuário autenticado."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 from zoneinfo import ZoneInfo
-from fastapi import Depends, HTTPException, Response
+from fastapi import Depends, HTTPException, Response, Query
 from uuid import UUID
 from pydantic import AwareDatetime, Field, model_validator
 from .models import StrictModel
@@ -16,11 +17,19 @@ class DriverVisit(StrictModel):
     cliente_id: UUID
     versao_rota: int = Field(ge=1)
     concluida_em: AwareDatetime
-    itens: list[Item] = Field(min_length=1,max_length=50)
+    status: Literal['concluida','nao_atendida'] = 'concluida'
+    motivo: str | None = Field(default=None,max_length=1000)
+    itens: list[Item] = Field(default_factory=list,max_length=50)
     observacoes: str | None = Field(default=None,max_length=2000)
 
     @model_validator(mode='after')
     def validate_collection(self):
+        if self.status=='nao_atendida':
+            if not self.coleta_id or self.itens or not self.motivo:
+                raise ValueError('Não atendimento exige coleta planejada e motivo, sem volumes.')
+            if self.concluida_em>datetime.now(timezone.utc)+timedelta(minutes=5):
+                raise ValueError('A ocorrência não pode estar no futuro.')
+            return self
         CollectionCreate(id_local_dispositivo=self.id_local_dispositivo,cliente_id=self.cliente_id,
             motorista_id=self.cliente_id,status='concluida',origem='rota_fixa',
             concluida_em=self.concluida_em,itens=self.itens,observacoes=self.observacoes)
@@ -36,6 +45,25 @@ def register_driver_day(app, authenticated):
         if not driver:
             raise HTTPException(403,'Cadastro de motorista inativo ou não encontrado.')
         return auth,driver['id']
+
+    @app.get('/motorista/historico',tags=['Aplicativo do motorista'])
+    def history(data_inicio:date|None=None,data_fim:date|None=None,
+                limit:int=Query(default=100,ge=1,le=200),offset:int=Query(default=0,ge=0),context=Depends(driver_auth)):
+        auth,mid=context
+        conn,user,_=auth
+        zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
+        end=data_fim or datetime.now(ZoneInfo(zone)).date()
+        start=data_inicio or end-timedelta(days=6)
+        if end<start or (end-start).days>30:
+            raise HTTPException(422,'Escolha um intervalo de até 31 dias.')
+        condition=""" FROM coletas WHERE motorista_id=%s AND
+            (coalesce(concluida_em,agendada_para,criado_em) AT TIME ZONE %s)::date BETWEEN %s AND %s"""
+        params=(mid,zone,start,end)
+        total=conn.execute('SELECT count(*) AS n'+condition,params).fetchone()['n']
+        rows=conn.execute("""SELECT id,status,tentativa,dados_registro->>'cliente_nome' AS cliente_nome,
+            coalesce(concluida_em,agendada_para,criado_em) AS data_referencia"""+condition+
+            ' ORDER BY data_referencia DESC,id LIMIT %s OFFSET %s',(*params,limit,offset)).fetchall()
+        return {'items':rows,'total':total,'data_inicio':start,'data_fim':end,'fuso_horario':zone}
 
     @app.get('/motorista/modalidades',tags=['Aplicativo do motorista'])
     def modalities(context=Depends(driver_auth)):
@@ -86,16 +114,18 @@ def register_driver_day(app, authenticated):
         conn,user,_=auth
         zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
         day=data or datetime.now(ZoneInfo(zone)).date()
-        routes=conn.execute('SELECT id FROM rotas WHERE motorista_id=%s AND ativa AND %s=ANY(dias_semana) ORDER BY id',
-                            (mid,day.isoweekday())).fetchall()
+        routes=conn.execute('''SELECT r.id FROM rotas r LEFT JOIN rota_excecoes x ON x.rota_id=r.id AND x.empresa_id=r.empresa_id AND x.data=%s
+            WHERE r.motorista_id=%s AND r.ativa AND coalesce(x.operar,%s=ANY(r.dias_semana)) ORDER BY r.id''',
+                            (day,mid,day.isoweekday())).fetchall()
         for route in routes:
             # Uma execução emitida não troca de motorista quando muda a rota recorrente.
             existing=conn.execute('SELECT motorista_id FROM execucoes_rotas WHERE rota_id=%s AND data=%s',(route['id'],day)).fetchone()
             if existing and existing['motorista_id']!=mid:
                 continue
             prepare(conn,user,route['id'],day,mid)
-        runs=conn.execute('SELECT * FROM execucoes_rotas WHERE motorista_id=%s AND data=%s ORDER BY rota_id',(mid,day)).fetchall()
-        plans=[display(conn,run) for run in runs]
+        runs=conn.execute('''SELECT e.* FROM execucoes_rotas e WHERE e.data=%s AND EXISTS
+            (SELECT 1 FROM coletas c WHERE c.execucao_id=e.id AND c.motorista_id=%s) ORDER BY e.rota_id''',(day,mid)).fetchall()
+        plans=[display(conn,run,mid) for run in runs]
         return {'data':day,'fuso_horario':zone,'rotas':plans,'total_paradas':sum(len(p['paradas']) for p in plans)}
 
     @app.get('/motorista/rota-do-dia' , tags=['Aplicativo do motorista'])

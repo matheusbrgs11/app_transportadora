@@ -38,9 +38,9 @@ Reinicie o backend após atualizar o código para disponibilizar `/motorista/mod
 
 ## Verificações pendentes no Android
 
-Teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Rascunhos de volumes e observações agora são persistidos por conta, rota, cliente e data. Podem ser recuperados após novo login ao abrir a mesma parada; não são enviados até salvar a coleta.
+Teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Rascunhos de volumes e observações agora são persistidos por conta e atendimento; rascunhos da versão anterior continuam recuperáveis na primeira tentativa. Podem ser recuperados após novo login ao abrir a mesma parada; não são enviados até salvar a coleta.
 
-Ainda faltam sincronização automática em segundo plano, login offline após reiniciar, assinatura, não atendimento/cancelamento, reconciliação de rota alterada, deduplicação de uma mesma parada entre aparelhos, rastreamento e notificações. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. Não há ferramenta de resolução desse conflito nesta primeira versão.
+Ainda faltam sincronização automática em segundo plano, login offline após reiniciar, assinatura, ferramenta de resolução dos conflitos, rastreamento e notificações. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. Não há ferramenta de resolução desse conflito nesta primeira versão.
 
 
 ## Testes econômicos sem emulador completo
@@ -49,6 +49,19 @@ Execute `../scripts/test-android.sh` a partir desta pasta. Robolectric simula AP
 
 Em 26/09/2026, 8 testes passaram na API 28, com APK recompilado e lint executado. Os testes cobrem armazenamento SQLite, isolamento, migração, confirmação de envio e recuperação de falhas. Não equivalem a homologação visual, GPS, bateria, sincronização automática ou Android → API real → painel.
 
-Conflitos 403/409/422 preservam o registro como `conflict` e deixam os demais seguirem. O botão de envio tenta novamente os registros não confirmados; falhas de rede e autenticação interrompem o lote sem excluir dados. Uma resposta sem confirmação válida não marca a coleta como enviada.
+Conflitos 403/404/409/422 preservam o registro como `conflict` e deixam os demais seguirem. O botão de envio tenta novamente os registros não confirmados; falhas de rede e autenticação interrompem o lote sem excluir dados. Uma resposta sem confirmação válida não marca a coleta como enviada.
 
-Ao atualizar a rota, o app prepara os atendimentos diários e recebe IDs estáveis. O registro envia `coleta_id` e conclui a mesma coleta exibida no painel. Visitas finalizadas no servidor aparecem sem botão de nova coleta após atualização. Exige backend com migração 005.
+Ao atualizar a rota, o app prepara os atendimentos diários e recebe IDs estáveis. O registro envia `coleta_id` e conclui a mesma coleta exibida no painel. Visitas finalizadas no servidor aparecem sem botão de nova coleta após atualização. Exige backend com migração 006.
+
+## Operação diária — 26/09/2026
+
+- A rota mostra tentativa e progresso no servidor. O progresso pode estar desatualizado enquanto offline; registros salvos localmente são indicados separadamente.
+- Não atendimento exige motivo, não aceita volumes e é salvo na mesma fila SQLite antes do envio. Na API, `concluida_em` transporta o instante da ocorrência por compatibilidade do payload; a coleta não recebe data de conclusão e o instante fica no evento auditado.
+- Revisitas têm outro `coleta_id`, evitando que a primeira tentativa esconda o botão da próxima. Só a operação pode criá-las.
+- Atendimentos transferidos aparecem ao atualizar a rota. Um envio do motorista anterior recusado com 404 é preservado como conflito; os demais continuam.
+- Histórico próprio de hoje ou dos últimos sete dias consultado online, com paginação de 50 registros. Ele não substitui a fila local nem inclui envios ainda não aceitos.
+- Cancelamento continua exclusivo do painel administrativo. Não há reabertura destrutiva do registro anterior.
+
+Teste de tela Robolectric: primeira tentativa concluída, revisita disponível, preenchimento do motivo e gravação offline pela interface. Ainda não é validação ponta a ponta com servidor real ou homologação em aparelho.
+
+Validação final desta entrega: 12 testes Robolectric aprovados (11 de armazenamento/sincronização e 1 de tela), APK debug e lint aprovados. Backend correspondente: 43 testes de integração aprovados.

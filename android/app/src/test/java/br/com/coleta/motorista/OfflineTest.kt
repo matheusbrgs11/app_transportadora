@@ -95,4 +95,32 @@ class OfflineTest {
         store.draft("a","stop",JSONObject().put("notes","Migrado"))
         assertEquals("Migrado",store.draft("a","stop")!!.getString("notes"))
     }
+    @Test fun nonattendanceRequiresMatchingReceiptAndSurvivesRetry() {
+        val visit=body().put("status","nao_atendida").put("motivo","Cliente fechado")
+        store.save("a",visit)
+        try { VisitSync(store,"a") { receipt() }.run(); fail() } catch (_:IllegalStateException) {}
+        assertEquals("pending",store.visits("a").single().getString("state"))
+        store.close(); store=Store(context)
+        assertEquals(1,VisitSync(store,"a") {
+            assertEquals(visit.toString(),it.toString())
+            receipt().put("status","nao_atendida")
+        }.run())
+        assertEquals("sent",store.visits("a").single().getString("state"))
+    }
+    @Test fun transferredVisitDoesNotBlockUnrelatedVisit() {
+        val visit=body(); store.save("a",visit); store.save("a",body())
+        assertEquals(1,VisitSync(store,"a") {
+            if(it.getString("id_local_dispositivo")==visit.getString("id_local_dispositivo")) throw ApiError(404,"Atendimento transferido")
+            receipt()
+        }.run())
+        assertEquals(listOf("conflict","sent"),store.visits("a").map { it.getString("state") })
+    }
+
+    @Test fun receiptForAnotherAttendanceCannotAcknowledgeVisit() {
+        val visit=body().put("coleta_id",UUID.randomUUID().toString()); store.save("a",visit)
+        try { VisitSync(store,"a") { receipt() }.run(); fail() } catch (_:IllegalStateException) {}
+        assertEquals("pending",store.visits("a").single().getString("state"))
+        assertEquals(1,VisitSync(store,"a") { receipt().put("id",visit.getString("coleta_id")) }.run())
+    }
+
 }

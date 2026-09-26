@@ -101,6 +101,8 @@ class MainActivity : Activity() {
         page("Minha rota")
         val records = store.visits(owner)
         text("${records.count { it.getString("state") != "sent" }} registros aguardando envio")
+        button("Meu histórico • hoje") { history(days = 1) }
+        button("Meu histórico • últimos 7 dias") { history() }
         button("Atualizar rota") { refresh() }
         button("Enviar registros salvos") { sync() }
         button("Sair / entrar novamente") {
@@ -117,16 +119,19 @@ class MainActivity : Activity() {
         if (routes.length()==0) text("Nenhuma rota programada para este dia.")
         for (r in 0 until routes.length()) {
             val route = routes.getJSONObject(r); text(route.getString("nome"),22f)
+            val progress = route.optJSONObject("progresso")
+            if (progress != null) text("No servidor: ${progress.optInt("agendada")} pendentes · ${progress.optInt("concluida")} concluídas · ${progress.optInt("nao_atendida")} não atendidas · ${progress.optInt("cancelada")} canceladas")
             val stops = route.getJSONArray("paradas")
             for (s in 0 until stops.length()) {
                 val stop = stops.getJSONObject(s)
-                text("${stop.getInt("ordem")}. ${stop.getString("nome")}",20f)
+                text("${stop.getInt("ordem")}. ${stop.getString("nome")} • tentativa ${stop.optInt("tentativa",1)}",20f)
                 text(listOf("endereco","numero","complemento","bairro","cidade","estado").filter { !stop.isNull(it) }.joinToString(", ") { stop.getString(it) })
                 if (!stop.isNull("telefone")) text("Telefone: ${stop.getString("telefone")}")
                 if (!stop.isNull("janela_inicio")) text("Atendimento: ${stop.getString("janela_inicio")}–${stop.getString("janela_fim")}")
                 val existing = records.lastOrNull {
                     val b=it.getJSONObject("body")
-                    b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
+                    if (!b.isNull("coleta_id") && !stop.isNull("coleta_id")) b.getString("coleta_id")==stop.getString("coleta_id")
+                    else b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
                         Instant.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
                 }
                 val remoteStatus=stop.optString("status","agendada")
@@ -135,8 +140,11 @@ class MainActivity : Activity() {
                     "cancelada" -> "Coleta cancelada"
                     else -> "Atendimento não realizado"
                 })
-                else if (existing != null) text(if (existing.getString("state")=="sent") "Coleta enviada" else "Coleta salva no aparelho • aguardando envio")
-                else if (current) button("Registrar coleta • ${stop.getString("nome")}") { visit(plan,route,stop) }
+                else if (existing != null) text(if (existing.getString("state")=="sent") "Atendimento enviado" else "Atendimento salvo no aparelho • aguardando envio")
+                else if (current) {
+                    button("Registrar coleta • ${stop.getString("nome")}") { visit(plan,route,stop) }
+                    button("Não atendida • ${stop.getString("nome")}") { notAttended(plan,route,stop) }
+                }
             }
         }
         records.filter { it.getString("state")!="sent" }.forEach {
@@ -144,7 +152,7 @@ class MainActivity : Activity() {
         }
     }
     private fun visit(plan: JSONObject, route: JSONObject, stop: JSONObject) {
-        val draftKey = plan.getString("data") + "|" + route.getString("id") + "|" + stop.getString("cliente_id")
+        val draftKey = draftKey(plan,route,stop)
         val draft = store.draft(owner,draftKey)
         page(stop.getString("nome"))
         text("Selecione as modalidades. Deixe a quantidade em branco se precisar conferir na base.")
@@ -200,6 +208,70 @@ class MainActivity : Activity() {
             try { store.saveDraftVisit(owner,draftKey,body); home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
         }
         button("Voltar • manter rascunho") { home() }
+    }
+    private fun draftKey(plan: JSONObject, route: JSONObject, stop: JSONObject): String {
+        val legacy = plan.getString("data") + "|" + route.getString("id") + "|" + stop.getString("cliente_id")
+        // Preserve drafts from the previous app while giving revisits their own identity.
+        if (stop.isNull("coleta_id") || (stop.optInt("tentativa",1)==1 && store.draft(owner,legacy)!=null)) return legacy
+        return stop.getString("coleta_id")
+    }
+
+    private fun notAttended(plan: JSONObject, route: JSONObject, stop: JSONObject) {
+        page("Não atendida • ${stop.getString("nome")}")
+        val key = draftKey(plan,route,stop) + "|nao_atendida"
+        val reason = field("Motivo obrigatório (até 1.000 caracteres)")
+        reason.setText(store.draft(owner,key)?.optString("motivo") ?: "")
+        reason.addTextChangedListener(object: TextWatcher {
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int) {}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {}
+            override fun afterTextChanged(s:Editable?) {
+                try { store.draft(owner,key,JSONObject().put("motivo",s.toString())) }
+                catch (_:Exception) { message("Não foi possível preservar o rascunho.") }
+            }
+        })
+        button("Salvar não atendimento no aparelho") {
+            val value = reason.text.toString().trim()
+            if (value.isEmpty() || value.length>1000 || stop.isNull("coleta_id")) {
+                message("Informe um motivo de até 1.000 caracteres e use uma rota atualizada."); return@button
+            }
+            val body=JSONObject().put("id_local_dispositivo",UUID.randomUUID().toString())
+                .put("coleta_id",stop.getString("coleta_id")).put("rota_id",route.getString("id"))
+                .put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
+                .put("concluida_em",Instant.now().toString()).put("status","nao_atendida")
+                .put("motivo",value).put("itens",JSONArray())
+            try { store.saveDraftVisit(owner,key,body); home(); sync() }
+            catch (_:Exception) { message("Falha ao salvar. Mantenha esta tela e tente novamente.") }
+        }
+        button("Voltar • manter rascunho") { home() }
+    }
+
+    private fun history(offset: Int = 0, days: Int = 7) {
+        val service=api ?: return
+        var result: JSONObject? = null
+        val zone=ZoneId.of(day?.optString("fuso_horario") ?: "America/Sao_Paulo")
+        val end=LocalDate.now(zone)
+        val start=end.minusDays((days-1).toLong())
+        background({ result=service.request("/motorista/historico?limit=50&offset=$offset&data_inicio=$start&data_fim=$end") }, {
+            val data=result ?: return@background
+            page(if(days==1) "Meu histórico • hoje" else "Meu histórico • últimos 7 dias")
+            text("${data.getString("data_inicio")} a ${data.getString("data_fim")} • ${data.getInt("total")} atendimentos")
+            val rows=data.getJSONArray("items")
+            if (rows.length()==0) text("Nenhum atendimento neste período.")
+            for (i in 0 until rows.length()) {
+                val row=rows.getJSONObject(i)
+                val status=when(row.getString("status")) {
+                    "concluida" -> "Concluída"
+                    "nao_atendida" -> "Não atendida"
+                    "cancelada" -> "Cancelada"
+                    else -> "Pendente"
+                }
+                val local=Instant.parse(row.getString("data_referencia")).atZone(ZoneId.of(data.getString("fuso_horario")))
+                text("${row.getString("cliente_nome")} • $status • tentativa ${row.getInt("tentativa")}\n${local.toLocalDate()}")
+            }
+            if (offset>0) button("Página anterior") { history(maxOf(0,offset-50),days) }
+            if (offset+rows.length()<data.getInt("total")) button("Próxima página") { history(offset+50,days) }
+            button("Voltar para minha rota") { home() }
+        })
     }
     private fun sync() {
         val service=api ?: return

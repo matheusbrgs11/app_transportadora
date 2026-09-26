@@ -1,4 +1,4 @@
-"""Execuções imutáveis da rota: uma visita por cliente em cada execução diária."""
+"""Planejamento imutável da rota e tentativas explícitas de atendimento."""
 from datetime import datetime, time, date
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
@@ -24,7 +24,9 @@ def prepare(conn,user,rid,day,expected_driver=None):
     route=conn.execute('SELECT * FROM rotas WHERE id=%s FOR SHARE',(rid,)).fetchone()
     if not route or (expected_driver and route['motorista_id']!=expected_driver):
         raise HTTPException(404,'Rota não encontrada.')
-    if not route['ativa'] or day.isoweekday() not in route['dias_semana']:
+    exception=conn.execute('SELECT operar FROM rota_excecoes WHERE rota_id=%s AND data=%s',(rid,day)).fetchone()
+    operates=exception['operar'] if exception else day.isoweekday() in route['dias_semana']
+    if not route['ativa'] or not operates:
         raise HTTPException(422,'Rota não programada para esta data.')
     driver=conn.execute('''SELECT m.id,u.nome FROM motoristas m JOIN usuarios u ON u.id=m.usuario_id
         AND u.empresa_id=m.empresa_id WHERE m.id=%s AND m.ativo AND u.ativo FOR SHARE OF m''',(route['motorista_id'],)).fetchone()
@@ -58,15 +60,22 @@ def prepare(conn,user,rid,day,expected_driver=None):
     return run
 
 
-def display(conn,run):
+def display(conn,run,mid=None):
     plan=json.loads(json.dumps(run['planejamento']))
-    records=conn.execute('SELECT id,cliente_id,status,versao FROM coletas WHERE execucao_id=%s',(run['id'],)).fetchall()
-    by_client={str(r['cliente_id']):r for r in records}
-    for stop in plan['paradas']:
-        record=by_client[stop['cliente_id']]
+    records=conn.execute('SELECT id,cliente_id,motorista_id,status,versao,tentativa FROM coletas WHERE execucao_id=%s ORDER BY tentativa,id',(run['id'],)).fetchall()
+    stops={p['cliente_id']:p for p in plan['paradas']}
+    expanded=[]
+    for record in records:
+        if mid and record['motorista_id']!=mid:
+            continue
+        stop=dict(stops[str(record['cliente_id'])])
         stop.pop('cnpj',None)
-        stop.update(coleta_id=record['id'],status=record['status'],versao_coleta=record['versao'])
-    return {**plan,'execucao_id':run['id'],'data':run['data'],'fuso_horario':run['fuso_horario']}
+        stop.update(coleta_id=record['id'],status=record['status'],versao_coleta=record['versao'],
+                    motorista_id=record['motorista_id'],tentativa=record['tentativa'])
+        expanded.append(stop)
+    plan['paradas']=sorted(expanded,key=lambda p:(p['ordem'],p['tentativa']))
+    progress={state:sum(p['status']==state for p in expanded) for state in ['agendada','concluida','nao_atendida','cancelada']}
+    return {**plan,'execucao_id':run['id'],'data':run['data'],'fuso_horario':run['fuso_horario'],'progresso':progress}
 
 
 def complete(conn,user,mid,body,response):
@@ -79,7 +88,7 @@ def complete(conn,user,mid,body,response):
         if previous['usuario_id']!=user['id'] or previous['requisicao_hash']!=digest:
             raise HTTPException(409,'Identificador já usado com outro conteúdo.')
         response.status_code=200
-        return {'id':previous['coleta_id'],'status':'concluida'}
+        return {'id':previous['coleta_id'],'status':previous['status']}
     old=conn.execute('''SELECT c.*,e.rota_id,e.planejamento,e.data AS dia,e.fuso_horario FROM coletas c
         JOIN execucoes_rotas e ON e.id=c.execucao_id AND e.empresa_id=c.empresa_id
         WHERE c.id=%s AND c.motorista_id=%s FOR UPDATE OF c''',(body.coleta_id,mid)).fetchone()
@@ -91,28 +100,32 @@ def complete(conn,user,mid,body,response):
         raise HTTPException(422,'A realização deve pertencer ao dia do atendimento.')
     if old['status']!='agendada':
         raise HTTPException(409,'Atendimento já finalizado. Atualize sua rota; não crie outra visita.')
-    mods=conn.execute('SELECT id,nome FROM modalidades WHERE id=ANY(%s) AND ativa',([i.modalidade_id for i in body.itens],)).fetchall()
-    if len(mods)!=len(body.itens):
-        raise HTTPException(422,'Selecione modalidades ativas da sua empresa.')
-    existing=conn.execute('SELECT modalidade_id FROM coleta_itens WHERE coleta_id=%s',(old['id'],)).fetchall()
-    if existing and {r['modalidade_id'] for r in existing}!={i.modalidade_id for i in body.itens}:
-        raise HTTPException(409,'Modalidades alteradas pela operação. Confira o atendimento.')
-    names={r['id']:r['nome'] for r in mods}
-    for item in body.itens:
-        conn.execute('''INSERT INTO coleta_itens(empresa_id,coleta_id,modalidade_id,modalidade_nome,quantidade,quantidade_status)
-            VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT(empresa_id,coleta_id,modalidade_id)
-            DO UPDATE SET quantidade=EXCLUDED.quantidade,quantidade_status=EXCLUDED.quantidade_status''',
-            (user['empresa_id'],old['id'],item.modalidade_id,names[item.modalidade_id],item.quantidade,item.quantidade_status))
-    conn.execute("UPDATE coletas SET status='concluida',concluida_em=%s,observacoes=%s,versao=versao+1 WHERE id=%s",
-                 (body.concluida_em,body.observacoes,old['id']))
-    add_event(conn,user,old['id'],'agendada','concluida',dados=payload)
-    conn.execute('INSERT INTO envios_motorista VALUES(%s,%s,%s,%s,%s)',
-                 (user['empresa_id'],body.id_local_dispositivo,user['id'],old['id'],digest))
+    if body.status=='concluida':
+        mods=conn.execute('SELECT id,nome FROM modalidades WHERE id=ANY(%s) AND ativa',([i.modalidade_id for i in body.itens],)).fetchall()
+        if len(mods)!=len(body.itens):
+            raise HTTPException(422,'Selecione modalidades ativas da sua empresa.')
+        existing=conn.execute('SELECT modalidade_id FROM coleta_itens WHERE coleta_id=%s',(old['id'],)).fetchall()
+        if existing and {r['modalidade_id'] for r in existing}!={i.modalidade_id for i in body.itens}:
+            raise HTTPException(409,'Modalidades alteradas pela operação. Confira o atendimento.')
+        names={r['id']:r['nome'] for r in mods}
+        for item in body.itens:
+            conn.execute('''INSERT INTO coleta_itens(empresa_id,coleta_id,modalidade_id,modalidade_nome,quantidade,quantidade_status)
+                VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT(empresa_id,coleta_id,modalidade_id)
+                DO UPDATE SET quantidade=EXCLUDED.quantidade,quantidade_status=EXCLUDED.quantidade_status''',
+                (user['empresa_id'],old['id'],item.modalidade_id,names[item.modalidade_id],item.quantidade,item.quantidade_status))
+    conn.execute("UPDATE coletas SET status=%s,concluida_em=%s,observacoes=%s,versao=versao+1 WHERE id=%s",
+                 (body.status,body.concluida_em if body.status=='concluida' else None,body.observacoes,old['id']))
+    add_event(conn,user,old['id'],'agendada',body.status,body.motivo,dados=payload)
+    conn.execute('INSERT INTO envios_motorista VALUES(%s,%s,%s,%s,%s,%s)',
+                 (user['empresa_id'],body.id_local_dispositivo,user['id'],old['id'],digest,body.status))
     response.status_code=200
-    return {'id':old['id'],'status':'concluida'}
+    return {'id':old['id'],'status':body.status}
 
 
 def register_daily(app,staff):
+    from .day_actions import register_day_actions
+    register_day_actions(app,staff)
+
     @app.post('/rotas/{rota_id}/execucoes',tags=['Rotas'])
     def prepare_route(rota_id:UUID,data:date|None=None,auth=Depends(staff)):
         conn,user,_=auth

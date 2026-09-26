@@ -4,7 +4,7 @@ Atualizado em 26/09/2026. Esta é a lista de referência solicitada pelo usuári
 
 ## Como seguir este plano
 
-Executar as etapas na ordem abaixo, respeitando dependências. Ao retomar, consultar este arquivo e iniciar pelo primeiro item pendente desbloqueado. Atualizar as caixas e registrar evidências, testes, limitações e data ao terminar cada entrega. Código escrito ou APK compilado, isoladamente, não comprovam um fluxo funcionando. Itens bloqueados continuam abertos, com motivo e próximo passo; avançar em tarefas independentes. Mudanças de escopo devem ser registradas aqui e alinhadas com o usuário. Não ampliar o escopo indefinidamente.
+Executar as etapas na ordem abaixo, respeitando dependências. Ao retomar, consultar este arquivo e iniciar pelo primeiro item pendente desbloqueado. Atualizar as caixas e registrar evidências, testes, limitações e data ao terminar cada entrega. Código escrito ou APK compilado, isoladamente, não comprovam um fluxo funcionando. Itens bloqueados continuam abertos, com motivo e próximo passo; avançar em tarefas independentes. Ao concluir cada entrega, enviar ao usuário: mudanças, evidências de validação e lista atualizada das pendências. Mudanças de escopo devem ser registradas aqui e alinhadas com o usuário. Não ampliar o escopo indefinidamente.
 
 Conclusão significa uma primeira versão comercial multiempresa com os fluxos abaixo validados, operação em nuvem e piloto aprovado. Não significa encerrar manutenção ou garantir ausência de defeitos. Serviços pagos, domínio, canal de distribuição e decisões comerciais serão definidos antes da contratação; este plano não autoriza compras.
 
@@ -32,11 +32,13 @@ Aceite: fluxo Android → API → painel funcionando; nenhuma perda de registro 
 ## 2. Unificar planejamento e execução das coletas
 
 - [x] Criar execução diária da rota com cópia de paradas, motorista, ordem e janelas; preservar o planejamento histórico.
-- [ ] Definir exceções por data (feriado, pausa, substituição de motorista) e política de nova visita ao mesmo cliente.
+- [x] Exceções por data (feriado/pausa/dia extra), substituição por transferência dos atendimentos pendentes e revisitas explícitas na mesma execução.
 - [x] Gerar atendimentos do dia uma única vez e vincular conclusão do motorista ao agendamento existente, evitando uma segunda coleta independente. Validado nos endpoints; integração visual Android ainda pendente.
-- [ ] Implementar pendente, concluída, não atendida e cancelada nos perfis autorizados; exigir motivo onde necessário.
-- [ ] Mostrar progresso do dia no painel e histórico próprio do motorista por dia/semana.
-- [ ] Tratar transferência de rota, alteração durante execução, reabertura autorizada e concorrência entre aparelhos com auditoria.
+- [x] Estados pendente/concluída/não atendida/cancelada nos perfis autorizados. Motorista conclui ou registra não atendimento; cancelamento fica com a operação, com motivo.
+- [x] Progresso da execução no painel e no Android; histórico próprio do motorista de hoje/últimos sete dias, paginado. Atualização manual.
+- [x] Transferência individual de atendimentos pendentes da rota, planejamento preservado, nova tentativa autorizada sem apagar a anterior e concorrência entre aparelhos com auditoria.
+
+Homologação Android → API → painel ainda pendente (etapa 1).
 
 Aceite: uma visita planejada tem identidade estável até o histórico; reenvios e aparelhos simultâneos não duplicam o atendimento; revisitas legítimas são explícitas.
 
@@ -106,7 +108,8 @@ Aceite: administrador da empresa executa a rotina sem intervenção técnica no 
 
 ## 9. Nuvem, segurança e operação
 
-- [ ] Definir capacidade inicial, orçamento, provedor/região e requisitos de disponibilidade; aprovar custos.
+- [ ] Definir capacidade inicial, orçamento, região e requisitos de disponibilidade; aprovar custos. Preferência do usuário: Supabase para PostgreSQL. Projeto ainda não identificado; hospedagem da API/painel ainda precisa ser definida.
+- [ ] Validar migrações, PostGIS, papéis/permissões, conexão TLS/pooler e isolamento no Supabase de homologação antes de usar produção. Não presumir compatibilidade de superusuário nem expor tabelas operacionais pela Data API.
 - [ ] Preparar homologação e produção separadas: API, painel, PostgreSQL/PostGIS e arquivos privados, com domínio/HTTPS.
 - [ ] Gerenciar segredos e permissões mínimas; aplicar limites de login/upload, logs sem credenciais e limpeza de sessões/prévias.
 - [ ] Validar isolamento de empresas em todos os módulos, arquivos, exports e tarefas em segundo plano.
@@ -145,3 +148,7 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 26/09/2026: 8 testes Android Robolectric aprovados (API 28), APK debug recompilado e lint executado. Validados cache/fila entre contas, persistência ao reabrir banco, conflito sem bloquear demais visitas, resposta perdida, sessão expirada, confirmação inválida, rascunho e migração SQLite v1→v2. Etapa 1 segue aberta: sem execução ponta a ponta em aparelho/emulador completo.
 
 - 26/09/2026: migração 005 e execução diária entregues. 40 testes backend aprovados, incluindo concorrência na preparação/conclusão, snapshots, compatibilidade e isolamento. Painel prepara o dia e conclui atendimentos sem modalidades prévias. Android atualizado para usar coleta_id. A etapa 2 permanece aberta para exceções, transferência, revisita, progresso/histórico próprio e homologação.
+
+- 26/09/2026: usuário informou conta Supabase e pediu lista restante a cada entrega. Supabase adotado como destino preferido do banco, sujeito à validação técnica; aguardando identificação do projeto. Nenhum recurso em nuvem foi criado ou migrado.
+
+- 26/09/2026: concluído o passo solicitado de operação diária (etapa 2 deste plano): exceções por data auditadas, transferência de pendentes, revisitas encadeadas, não atendimento offline, progresso e histórico próprio diário/semanal. Migração 006 aplicada no banco privado local. Validação: 43 testes backend, 12 testes Robolectric (incluindo tela de revisita/não atendimento), build web, APK debug e lint aprovados. Mantidos pendentes homologação real, resolução assistida de conflitos e demais etapas. Próxima implementação: completar operação offline (etapa 3); homologação física da etapa 1 continua necessária.

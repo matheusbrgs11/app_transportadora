@@ -89,7 +89,7 @@ class QuantityCorrection(StrictModel):
 
 
 SELECT_COLLECTION='''SELECT c.id,c.cliente_id,c.motorista_id,c.status,c.origem,c.agendada_para,c.concluida_em,
- c.criado_em,c.versao,c.observacoes,c.dados_registro,c.assinatura_chave,
+ c.criado_em,c.versao,c.tentativa,c.revisita_de,c.observacoes,c.dados_registro,c.assinatura_chave,
  coalesce(c.concluida_em,c.agendada_para,c.criado_em) AS data_referencia,
  coalesce(c.dados_registro->>'cliente_nome',cl.nome) AS cliente_nome,
  coalesce(c.dados_registro->>'cliente_cnpj',cl.cnpj) AS cliente_cnpj,
