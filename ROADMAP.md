@@ -1,0 +1,147 @@
+# Plano de conclusão do Coleta — versão comercial inicial
+
+Atualizado em 26/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
+
+## Como seguir este plano
+
+Executar as etapas na ordem abaixo, respeitando dependências. Ao retomar, consultar este arquivo e iniciar pelo primeiro item pendente desbloqueado. Atualizar as caixas e registrar evidências, testes, limitações e data ao terminar cada entrega. Código escrito ou APK compilado, isoladamente, não comprovam um fluxo funcionando. Itens bloqueados continuam abertos, com motivo e próximo passo; avançar em tarefas independentes. Mudanças de escopo devem ser registradas aqui e alinhadas com o usuário. Não ampliar o escopo indefinidamente.
+
+Conclusão significa uma primeira versão comercial multiempresa com os fluxos abaixo validados, operação em nuvem e piloto aprovado. Não significa encerrar manutenção ou garantir ausência de defeitos. Serviços pagos, domínio, canal de distribuição e decisões comerciais serão definidos antes da contratação; este plano não autoriza compras.
+
+## Base existente (preservar e evoluir)
+
+- [x] Backend FastAPI/PostgreSQL/PostGIS com isolamento de empresas e autenticação por perfil.
+- [x] Painel de clientes, importação ODS/XLSX com prévia, motoristas/veículos e rotas fixas.
+- [x] Histórico de coletas por cliente, filtros, modalidades e correções auditadas.
+- [x] API restrita do motorista para rota do dia e registro com reenvio idempotente.
+- [x] Código Android com cache/fila SQLite, registro de volumes e envio manual; APK debug compilado.
+- [x] Prévia web fictícia e repositório GitHub com o trabalho.
+
+Evidências já registradas: 34 testes de backend aprovados na última execução documentada, build web e APK debug compilados, importação pela interface conferida. Não foram repetidos nesta atualização de planejamento. Android ainda sem homologação em aparelho; sem nuvem operacional, rubrica, rastreamento ou chamados.
+
+## 1. Homologar a base Android
+
+- [ ] Configurar emulador sem exigir Android Studio, se houver virtualização e recursos; manter teste em aparelho real como requisito antes do piloto.
+- [ ] Testar login de motorista, rota correta, registro de visita e aparecimento no painel/histórico.
+- [ ] Conferir isolamento entre contas/empresas também no cache e na fila do aparelho.
+- [ ] Testar tela pequena, teclado, acessibilidade, voltar, rotação, encerramento e reabertura; corrigir falhas e preservar rascunhos.
+- [ ] Registrar procedimento de teste reproduzível e evidências.
+
+Aceite: fluxo Android → API → painel funcionando; nenhuma perda de registro já salvo ou exposição entre contas nos cenários testados.
+
+## 2. Unificar planejamento e execução das coletas
+
+- [x] Criar execução diária da rota com cópia de paradas, motorista, ordem e janelas; preservar o planejamento histórico.
+- [ ] Definir exceções por data (feriado, pausa, substituição de motorista) e política de nova visita ao mesmo cliente.
+- [x] Gerar atendimentos do dia uma única vez e vincular conclusão do motorista ao agendamento existente, evitando uma segunda coleta independente. Validado nos endpoints; integração visual Android ainda pendente.
+- [ ] Implementar pendente, concluída, não atendida e cancelada nos perfis autorizados; exigir motivo onde necessário.
+- [ ] Mostrar progresso do dia no painel e histórico próprio do motorista por dia/semana.
+- [ ] Tratar transferência de rota, alteração durante execução, reabertura autorizada e concorrência entre aparelhos com auditoria.
+
+Aceite: uma visita planejada tem identidade estável até o histórico; reenvios e aparelhos simultâneos não duplicam o atendimento; revisitas legítimas são explícitas.
+
+## 3. Completar operação offline
+
+- [ ] Persistir planejamento e rascunhos com migrações do banco local e proteção adequada dos dados.
+- [ ] Definir sessão segura, renovação, revogação e acesso offline após reabrir o app, com prazo/política explícitos.
+- [ ] Implementar sincronização automática com rede disponível e tentativas progressivas em segundo plano.
+- [ ] Separar pendente, enviando, enviado e conflito; permitir retentar e resolver conflito sem apagar o registro original.
+- [x] Impedir que um registro recusado bloqueie todos os demais envios. Validado para conflitos; autenticação/rede continuam interrompendo o envio e preservando a fila.
+- [ ] Testar modo avião, resposta perdida, rede oscilante, reinício, atualização do app, relógio incorreto, virada do dia e logout com pendências.
+
+Aceite: registros salvos sobrevivem aos cenários de falha, voltam ao servidor sem duplicação e têm estado compreensível para motorista e operação.
+
+## 4. Implementar rubrica e comprovante
+
+- [ ] Capturar assinatura com o dedo, nome do responsável e horário; permitir limpar/refazer antes da confirmação.
+- [ ] Definir obrigatoriedade e exceções justificadas (ausência/recusa), sem inventar assinatura.
+- [ ] Salvar imagem e metadados no aparelho antes do envio; integrar à fila offline.
+- [ ] Armazenar arquivos privadamente, validar formato/tamanho e vincular de forma consistente à coleta.
+- [ ] Exibir assinatura e comprovante aos usuários autorizados no painel; preservar auditoria.
+- [ ] Testar envio parcial, repetição, acesso de outra empresa e recuperação após falha.
+
+Aceite: comprovante correto recuperável, sem imagem pública nem perda após confirmação local. Revisão jurídica do texto e uso do comprovante na etapa 9; não presumir validade jurídica apenas pela captura.
+
+## 5. Localizar clientes e abrir navegação
+
+- [ ] Configurar provedor de mapas, chaves restritas, quotas, medição e alertas de custo.
+- [ ] Geocodificar endereços; tratar endereço ambíguo/inexistente e permitir confirmação/correção manual.
+- [ ] Respeitar condições de armazenamento e uso do provedor escolhido.
+- [ ] Exibir clientes e sequência de paradas no mapa administrativo.
+- [ ] Abrir navegação no Google Maps a partir do atendimento no Android.
+
+Aceite: endereços do piloto conferidos e navegação para o destino esperado; sem prometer otimização automática de rotas nesta versão.
+
+## 6. Rastreamento durante o turno
+
+- [ ] Implementar início/fim de turno, permissões, explicação ao motorista e indicação visível de rastreamento.
+- [ ] Capturar e transmitir posição em segundo plano, com frequência configurável e tratamento de bateria/rede.
+- [ ] Validar precisão/horário e impedir que posição atrasada substitua uma mais recente.
+- [ ] Mostrar motorista, última atualização e precisão no mapa; distinguir posição atual de posição antiga/indisponível.
+- [ ] Interromper rastreamento ao encerrar turno e aplicar política de retenção.
+- [ ] Testar aparelhos reais, economia de bateria, permissão revogada, falta de sinal e app em segundo plano.
+
+Aceite: operação identifica localização e sua atualidade; não há rastreamento fora do turno no fluxo definido; consumo validado no piloto.
+
+## 7. Chamados imprevistos
+
+- [ ] Criar chamado no painel com cliente, modalidade/volume esperado, prioridade e observações.
+- [ ] Sugerir motoristas por posição recente, disponibilidade, veículo e proximidade; calcular trajeto quando necessário.
+- [ ] Despachar para o motorista escolhido e enviar notificação.
+- [ ] Implementar recebimento, aceite/recusa com motivo, expiração, reatribuição e conclusão.
+- [ ] Integrar à lista de atendimentos e histórico como chamado imprevisto, sem duplicação.
+- [ ] Tratar motorista offline, posição antiga, notificações desativadas e dois operadores editando juntos.
+
+Aceite: chamado sai do painel, é recebido pelo motorista e termina no histórico com responsável e eventos; envio de notificação não é tratado como confirmação de recebimento.
+
+## 8. Finalizar gestão e relatórios
+
+- [ ] Gestão de usuários/perfis, recuperação e troca de senha, bloqueio de acesso e encerramento de sessões.
+- [ ] Gestão de empresas, fuso e modalidades próprias; onboarding sem editar diretamente o banco.
+- [ ] Exportar histórico filtrado em CSV e PDF, com conferência de totais e proteção contra fórmulas em CSV.
+- [ ] Resumo operacional de pendências, concluídas, não atendidas, volumes a conferir e chamados.
+- [ ] Padronizar erros, estados vazios, confirmações e acessibilidade das telas.
+
+Aceite: administrador da empresa executa a rotina sem intervenção técnica no banco; exportações correspondem aos filtros e permissões.
+
+## 9. Nuvem, segurança e operação
+
+- [ ] Definir capacidade inicial, orçamento, provedor/região e requisitos de disponibilidade; aprovar custos.
+- [ ] Preparar homologação e produção separadas: API, painel, PostgreSQL/PostGIS e arquivos privados, com domínio/HTTPS.
+- [ ] Gerenciar segredos e permissões mínimas; aplicar limites de login/upload, logs sem credenciais e limpeza de sessões/prévias.
+- [ ] Validar isolamento de empresas em todos os módulos, arquivos, exports e tarefas em segundo plano.
+- [ ] Definir retenção, descarte, acesso aos dados, termos e privacidade com revisão adequada, incluindo localização e assinatura.
+- [ ] Automatizar backups do banco/arquivos e comprovar restauração; definir prazo de recuperação e perda máxima aceitável.
+- [ ] Monitorar erros, indisponibilidade, fila e custos; testar alertas e documentar atendimento a incidentes.
+- [ ] Automatizar testes/builds e publicação; adicionar Gradle Wrapper, gestão segura da chave de assinatura, migrações e reversão de versão.
+- [ ] Gerar release Android assinado, definir distribuição e atualização, verificando requisitos vigentes do canal escolhido.
+- [ ] Testar carga representativa e crescimento de dados; revisar dependências e corrigir vulnerabilidades relevantes.
+
+Aceite: operação funciona sem computador do desenvolvedor, restauração comprovada, acessos segregados e procedimento reproduzível de publicação/recuperação. Preparativos desta etapa podem ocorrer em paralelo; deve estar pronta antes do piloto com dados reais.
+
+## 10. Piloto e lançamento comercial
+
+- [ ] Preparar uma empresa real, base validada, quatro motoristas (três carros e uma moto) e treinamento.
+- [ ] Rodar teste ponta a ponta online/offline, rubrica, rastreamento, chamados, histórico e exportação.
+- [ ] Acompanhar período de piloto acordado; medir falhas, duplicações, tempo de sincronização, bateria e tempo de suporte.
+- [ ] Corrigir bloqueadores e obter aceite da transportadora sobre os fluxos críticos.
+- [ ] Validar preço, implantação, limites de uso, suporte, retenção e cancelamento; proposta anterior de preços é hipótese, não decisão fechada.
+- [ ] Definir cobrança e acompanhamento de pagamentos (processo manual é aceitável no início), sem perda indevida de dados ao suspender conta.
+- [ ] Documentar onboarding, ajuda ao motorista, suporte e plano de atualização; cadastrar segunda empresa para validar operação comercial multiempresa.
+- [ ] Publicar versão estável e registrar checklist final e responsáveis pela manutenção.
+
+Aceite final: todos os itens necessários acima concluídos com evidência, piloto aprovado, sem defeitos críticos conhecidos, backups recuperáveis e suporte/custos definidos. Teste em emulador não substitui homologação de GPS/bateria em aparelho real.
+
+## Fora desta versão
+
+iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integrações ERP/TMS específicas, marca própria por cliente e análises avançadas. Só entram mediante nova definição de escopo; não bloqueiam a conclusão acordada.
+
+## Registro de evolução
+
+- 26/09/2026: plano criado após revisão do README e documentação Android. Próxima entrega: etapa 1; projeto ainda pausado. Pendência externa principal: emulador ou aparelho disponível para teste, e aparelho real antes do piloto.
+
+- 26/09/2026: retomada. `/dev/kvm` indisponível; adotado Robolectric para testes de SQLite/fila sem emulador completo. Isso não conclui homologação visual, GPS/bateria ou teste ponta a ponta em aparelho.
+
+- 26/09/2026: 8 testes Android Robolectric aprovados (API 28), APK debug recompilado e lint executado. Validados cache/fila entre contas, persistência ao reabrir banco, conflito sem bloquear demais visitas, resposta perdida, sessão expirada, confirmação inválida, rascunho e migração SQLite v1→v2. Etapa 1 segue aberta: sem execução ponta a ponta em aparelho/emulador completo.
+
+- 26/09/2026: migração 005 e execução diária entregues. 40 testes backend aprovados, incluindo concorrência na preparação/conclusão, snapshots, compatibilidade e isolamento. Painel prepara o dia e conclui atendimentos sem modalidades prévias. Android atualizado para usar coleta_id. A etapa 2 permanece aberta para exceções, transferência, revisita, progresso/histórico próprio e homologação.

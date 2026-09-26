@@ -5,10 +5,12 @@ from fastapi import Depends, HTTPException, Response
 from uuid import UUID
 from pydantic import AwareDatetime, Field, model_validator
 from .models import StrictModel
+from .daily import prepare, display, complete, route_lock
 from .collections import CollectionCreate, Item, create_collection
 
 
 class DriverVisit(StrictModel):
+    coleta_id: UUID | None = None
     id_local_dispositivo: UUID
     rota_id: UUID
     cliente_id: UUID
@@ -43,6 +45,10 @@ def register_driver_day(app, authenticated):
     def visit(body:DriverVisit,response:Response,context=Depends(driver_auth)):
         auth,mid=context
         conn,user,_=auth
+        if body.coleta_id is not None:
+            return complete(conn,user,mid,body,response)
+        # Compatibilidade com filas de versões antigas do aplicativo.
+        route_lock(conn,user['empresa_id'],body.rota_id)
         # Serializa reenvios antes de verificar a rota: uma confirmação já gravada
         # continua recuperável mesmo se o planejamento mudar depois.
         conn.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',
@@ -52,6 +58,10 @@ def register_driver_day(app, authenticated):
         if previous and (previous['motorista_id']!=mid or previous['criado_por']!=user['id']):
             raise HTTPException(409,'Identificador já utilizado.')
         if not previous:
+            zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
+            if conn.execute('SELECT id FROM execucoes_rotas WHERE rota_id=%s AND data=%s',
+                            (body.rota_id,body.concluida_em.astimezone(ZoneInfo(zone)).date())).fetchone():
+                raise HTTPException(409,'Esta rota já possui atendimentos. Atualize o aplicativo e confira o registro pendente com a operação.')
             route=conn.execute('SELECT * FROM rotas WHERE id=%s AND motorista_id=%s AND ativa FOR SHARE',
                                (body.rota_id,mid)).fetchone()
             if not route:
@@ -69,6 +79,24 @@ def register_driver_day(app, authenticated):
             concluida_em=body.concluida_em,itens=body.itens,observacoes=body.observacoes)
         result=create_collection(payload,response,auth,source={'rota_id':str(body.rota_id),'versao_rota':body.versao_rota})
         return {'id':result['id'],'status':result['status']}
+
+    @app.post('/motorista/rota-do-dia/preparar',tags=['Aplicativo do motorista'])
+    def prepare_day(data:date|None=None,context=Depends(driver_auth)):
+        auth,mid=context
+        conn,user,_=auth
+        zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
+        day=data or datetime.now(ZoneInfo(zone)).date()
+        routes=conn.execute('SELECT id FROM rotas WHERE motorista_id=%s AND ativa AND %s=ANY(dias_semana) ORDER BY id',
+                            (mid,day.isoweekday())).fetchall()
+        for route in routes:
+            # Uma execução emitida não troca de motorista quando muda a rota recorrente.
+            existing=conn.execute('SELECT motorista_id FROM execucoes_rotas WHERE rota_id=%s AND data=%s',(route['id'],day)).fetchone()
+            if existing and existing['motorista_id']!=mid:
+                continue
+            prepare(conn,user,route['id'],day,mid)
+        runs=conn.execute('SELECT * FROM execucoes_rotas WHERE motorista_id=%s AND data=%s ORDER BY rota_id',(mid,day)).fetchall()
+        plans=[display(conn,run) for run in runs]
+        return {'data':day,'fuso_horario':zone,'rotas':plans,'total_paradas':sum(len(p['paradas']) for p in plans)}
 
     @app.get('/motorista/rota-do-dia' , tags=['Aplicativo do motorista'])
     def driver_day(data: date | None = None, auth=Depends(authenticated)):

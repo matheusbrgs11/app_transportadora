@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
 import android.text.InputType
+import android.text.TextWatcher
+import android.text.Editable
 import android.view.View
 import android.widget.*
 import org.json.JSONArray
@@ -90,7 +92,7 @@ class MainActivity : Activity() {
     private fun refresh() {
         val service = api ?: return
         background({
-            val updated = service.request("/motorista/rota-do-dia")
+            val updated = service.request("/motorista/rota-do-dia/preparar",JSONObject())
             updated.put("modalidades",service.request("/motorista/modalidades").getJSONArray("items"))
             store.cache(owner,updated); day = updated
         }, { home() })
@@ -127,7 +129,13 @@ class MainActivity : Activity() {
                     b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
                         Instant.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
                 }
-                if (existing != null) text(if (existing.getString("state")=="sent") "Coleta enviada" else "Coleta salva no aparelho • aguardando envio")
+                val remoteStatus=stop.optString("status","agendada")
+                if (remoteStatus!="agendada") text(when(remoteStatus) {
+                    "concluida" -> "Coleta concluída"
+                    "cancelada" -> "Coleta cancelada"
+                    else -> "Atendimento não realizado"
+                })
+                else if (existing != null) text(if (existing.getString("state")=="sent") "Coleta enviada" else "Coleta salva no aparelho • aguardando envio")
                 else if (current) button("Registrar coleta • ${stop.getString("nome")}") { visit(plan,route,stop) }
             }
         }
@@ -136,6 +144,8 @@ class MainActivity : Activity() {
         }
     }
     private fun visit(plan: JSONObject, route: JSONObject, stop: JSONObject) {
+        val draftKey = plan.getString("data") + "|" + route.getString("id") + "|" + stop.getString("cliente_id")
+        val draft = store.draft(owner,draftKey)
         page(stop.getString("nome"))
         text("Selecione as modalidades. Deixe a quantidade em branco se precisar conferir na base.")
         val mods = plan.getJSONArray("modalidades")
@@ -147,7 +157,34 @@ class MainActivity : Activity() {
             entries.add(Triple(m.getString("id"),selected,quantity))
         }
         val notes=field("Observações")
+        fun persistDraft() {
+            val fields=JSONObject()
+            for ((id,selected,quantity) in entries) fields.put(id,JSONObject()
+                .put("selected",selected.isChecked).put("quantity",quantity.text.toString()))
+            try { store.draft(owner,draftKey,JSONObject().put("fields",fields).put("notes",notes.text.toString())) }
+            catch (_: Exception) { message("Falha ao preservar rascunho. Não feche esta tela antes de salvar.") }
+        }
+        val watcher=object:TextWatcher {
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int) {}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {}
+            override fun afterTextChanged(s:Editable?) { persistDraft() }
+        }
+        for ((id,selected,quantity) in entries) {
+            val saved=draft?.optJSONObject("fields")?.optJSONObject(id)
+            selected.isChecked=saved?.optBoolean("selected") ?: false
+            quantity.setText(saved?.optString("quantity") ?: "")
+        }
+        notes.setText(draft?.optString("notes") ?: "")
+        for ((_,selected,quantity) in entries) {
+            selected.setOnCheckedChangeListener { _,_ -> persistDraft() }
+            quantity.addTextChangedListener(watcher)
+        }
+        notes.addTextChangedListener(watcher)
+        text("Rascunho preservado neste aparelho. Só será enviado após salvar a coleta.")
         button("Salvar coleta no aparelho") {
+            if (stop.isNull("coleta_id")) {
+                message("Atualize a rota antes de registrar esta coleta. O rascunho foi preservado."); return@button
+            }
             val items=JSONArray()
             for ((id,selected,quantity) in entries) {
                 if (!selected.isChecked) continue
@@ -158,24 +195,16 @@ class MainActivity : Activity() {
             }
             if (items.length()==0) { message("Selecione ao menos uma modalidade."); return@button }
             val body=JSONObject().put("id_local_dispositivo",UUID.randomUUID().toString()).put("rota_id",route.getString("id"))
-                .put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
+                .put("coleta_id",stop.getString("coleta_id")).put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
                 .put("concluida_em",Instant.now().toString()).put("itens",items).put("observacoes",notes.text.toString())
-            try { store.save(owner,body); home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
+            try { store.saveDraftVisit(owner,draftKey,body); home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
         }
-        button("Voltar sem salvar") { home() }
+        button("Voltar • manter rascunho") { home() }
     }
     private fun sync() {
         val service=api ?: return
         background({
-            for (record in store.visits(owner).filter { it.getString("state")!="sent" }) {
-                try {
-                    service.request("/motorista/coletas",record.getJSONObject("body"))
-                    store.state(owner,record.getString("id"),"sent")
-                } catch (e: Exception) {
-                    store.state(owner,record.getString("id"),"pending",e.message ?: "Falha de conexão")
-                    throw e
-                }
-            }
+            VisitSync(store, owner) { body -> service.request("/motorista/coletas", body) }.run()
         }, { home() })
     }
     override fun onDestroy() { super.onDestroy(); executor.shutdown() }

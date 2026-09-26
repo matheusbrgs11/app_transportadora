@@ -6,12 +6,35 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.database.sqlite.SQLiteDatabase
 import org.json.JSONObject
 
-class Store(context: Context) : SQLiteOpenHelper(context, "coleta.db", null, 1) {
+class Store(context: Context) : SQLiteOpenHelper(context, "coleta.db", null, 2) {
+    private fun drafts(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE drafts(owner TEXT NOT NULL, stop TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(owner,stop))")
+    }
     override fun onCreate(db: SQLiteDatabase) {
+        drafts(db)
         db.execSQL("CREATE TABLE cache(owner TEXT PRIMARY KEY, payload TEXT NOT NULL)")
         db.execSQL("CREATE TABLE visits(id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL, error TEXT NOT NULL)")
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { error("Migração não definida") }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) drafts(db)
+    }
+    fun draft(owner: String, stop: String): JSONObject? = readableDatabase.rawQuery(
+        "SELECT payload FROM drafts WHERE owner=? AND stop=?", arrayOf(owner,stop)
+    ).use { if(it.moveToFirst()) JSONObject(it.getString(0)) else null }
+    fun draft(owner: String, stop: String, payload: JSONObject) {
+        writableDatabase.insertWithOnConflict("drafts",null,ContentValues().apply {
+            put("owner",owner); put("stop",stop); put("payload",payload.toString())
+        },SQLiteDatabase.CONFLICT_REPLACE)
+    }
+    fun saveDraftVisit(owner: String, stop: String, body: JSONObject) {
+        val db=writableDatabase
+        db.beginTransaction()
+        try {
+            save(owner,body)
+            db.delete("drafts","owner=? AND stop=?",arrayOf(owner,stop))
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+    }
     fun cache(owner: String, payload: JSONObject) {
         writableDatabase.insertWithOnConflict("cache", null, ContentValues().apply {
             put("owner", owner); put("payload", payload.toString())

@@ -21,6 +21,7 @@ from .importer import preview, MAX_BYTES
 from .operations import register_operations
 from .collections import register_collections
 from .driver_day import register_driver_day
+from .daily import register_daily
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -218,6 +219,7 @@ def create_app(settings: Settings | None = None):
         query = sql.SQL('UPDATE clientes SET {} WHERE id=%s RETURNING '+CLIENT_SELECT).format(sql.SQL(',').join(assignments))
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
+    register_daily(app,staff)
     register_driver_day(app,authenticated)
     register_operations(app,staff,admin,PASSWORDS)
     register_collections(app,staff,admin)

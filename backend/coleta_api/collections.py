@@ -246,7 +246,15 @@ def register_collections(app,staff,admin):
             raise HTTPException(409,'Somente coletas agendadas podem mudar de situação nesta etapa.')
         if body.status=='concluida':
             existing=conn.execute('SELECT modalidade_id FROM coleta_itens WHERE coleta_id=%s',(coleta_id,)).fetchall()
-            if {r['modalidade_id'] for r in existing}!={i.modalidade_id for i in body.itens}:
+            if not existing and old['execucao_id']:
+                mods=conn.execute('SELECT id,nome FROM modalidades WHERE id=ANY(%s) AND ativa',([i.modalidade_id for i in body.itens],)).fetchall()
+                if len(mods)!=len(body.itens):
+                    raise HTTPException(422,'Selecione modalidades ativas da empresa.')
+                names={m['id']:m['nome'] for m in mods}
+                for item in body.itens:
+                    conn.execute('''INSERT INTO coleta_itens(empresa_id,coleta_id,modalidade_id,modalidade_nome,quantidade,quantidade_status)
+                        VALUES(%s,%s,%s,%s,%s,%s)''',(user['empresa_id'],coleta_id,item.modalidade_id,names[item.modalidade_id],item.quantidade,item.quantidade_status))
+            elif {r['modalidade_id'] for r in existing}!={i.modalidade_id for i in body.itens}:
                 raise HTTPException(422,'Informe todas as modalidades já registradas nesta coleta, sem adicionar outras.')
             for item in body.itens:
                 conn.execute('''UPDATE coleta_itens SET quantidade=%s,quantidade_status=%s

@@ -1,5 +1,7 @@
 # Coleta
 
+Plano de execução até a primeira versão comercial: [ROADMAP.md](ROADMAP.md). Consultar e atualizar esse checklist a cada retomada e entrega.
+
 Painel React e backend FastAPI/PostgreSQL para clientes, motoristas, rotas, coletas e histórico de várias transportadoras. Desenvolvimento local, sem Docker. Primeira implementação Android em `android/`, APK debug compilado, homologação em aparelho pendente; geocodificação pendente.
 
 ## Executar sem Docker
@@ -64,7 +66,7 @@ Endpoints:
 
 Repetir o mesmo UUID e conteúdo em `POST /coletas` retorna a coleta existente (200), inclusive sob chamadas concorrentes. Conteúdo diferente com o mesmo UUID retorna 409. A primeira criação retorna 201. O painel mantém o UUID durante tentativas do formulário. Isso protege reenvios, mas não implementa uma fila offline Android. Mudanças de situação/conferência usam versão para impedir sobrescrita; após conflito, use **Atualizar detalhes**.
 
-A origem `rota_fixa` é informada manualmente; ainda não há geração automática diária de coletas a partir das rotas. Não há captura de assinatura, exportação CSV/PDF ou reabertura de registros terminais nesta entrega. Operadores/administradores registram e consultam; motoristas terão seus endpoints próprios com o aplicativo Android.
+Rotas podem gerar atendimentos diários no botão **Preparar atendimentos de hoje** ou ao atualizar a rota no Android. A geração é solicitada pelo usuário/app, não por um agendador em segundo plano. Coletas avulsas cadastradas manualmente continuam separadas e não são vinculadas por aproximação de cliente/data. Não há captura de assinatura, exportação CSV/PDF ou reabertura de registros terminais nesta entrega. Operadores/administradores registram e consultam; motoristas usam os endpoints próprios descritos abaixo.
 
 ## Consulta do motorista
 
@@ -74,7 +76,7 @@ Retorna `data`, `fuso_horario`, dados básicos do próprio motorista/veículo, `
 
 Sem parâmetro, o dia é calculado no fuso da transportadora. `?data=2026-09-07` permite consultar o planejamento recorrente para um dia específico. Essa consulta usa o cadastro **atual** das rotas; não representa o histórico de como uma rota estava organizada no passado. Dias sem rota retornam uma lista vazia. A consulta não gera coletas, não registra visitas e não implementa sincronização offline.
 
-A primeira tela nativa e a fila local estão em [android/README.md](android/README.md), com APK debug compilado e teste em aparelho pendente. `GET /motorista/modalidades` fornece modalidades ativas. `POST /motorista/coletas` registra visitas concluídas da própria rota: exige UUID local, rota/versão, cliente, data com fuso, itens e observações opcionais. Confere atribuição, dia da semana e pertencimento do cliente; mudanças na rota geram conflito. A rota/versão fica preservada no evento de criação. Reenvio idêntico retorna 200; alteração de conteúdo com o mesmo UUID retorna 409. O endpoint não conclui agendamentos existentes: cria um registro de visita separado, sem gerar automaticamente coletas da rota. Testes verificam ordem/janelas, domingo, fuso na virada do dia, rotas inativas, ausência de gravações e isolamento entre motoristas/empresas.
+A primeira tela nativa e a fila local estão em [android/README.md](android/README.md), com APK debug compilado e teste em aparelho pendente. `GET /motorista/modalidades` fornece modalidades ativas. `POST /motorista/coletas` registra visitas concluídas da própria rota: exige UUID local, rota/versão, cliente, data com fuso, itens e observações opcionais. Confere atribuição, dia da semana e pertencimento do cliente; mudanças na rota geram conflito. A rota/versão fica preservada no evento de criação. Reenvio idêntico retorna 200; alteração de conteúdo com o mesmo UUID retorna 409. O aplicativo atualizado envia `coleta_id` para concluir o agendamento gerado na execução diária. O formato legado sem esse campo só é aceito quando não há execução diária na rota/data; conflitos exigem conferência, sem descarte da fila. Testes verificam ordem/janelas, domingo, fuso na virada do dia, rotas inativas, ausência de gravações e isolamento entre motoristas/empresas.
 
 ## Importação
 
@@ -100,7 +102,7 @@ Mapeamento: NOME, ENDERECO, NUMERO, COMPL, BAIRRO, CIDADE, ESTADO, CEP, TELEFONE
 
 Os testes iniciam PostgreSQL temporário privado em `/tmp`, aplicam migrações, verificam a API com duas empresas e removem o cluster ao final. Não usam o serviço PostgreSQL nem o banco de desenvolvimento.
 
-Última execução: 34 testes aprovados, com duas advertências de depreciação das bibliotecas de testes. Cobertura: isolamento entre empresas, perfis, autenticação, importação/rollback, veículos/rotas, registro de coletas, reenvio concorrente, estados, auditoria, preservação de dados históricos e limites de período/filtros por modalidade.
+Última execução: 40 testes aprovados, com duas advertências de depreciação das bibliotecas de testes. Cobertura: isolamento entre empresas, perfis, autenticação, importação/rollback, veículos/rotas, registro de coletas, reenvio concorrente, estados, auditoria, preservação de dados históricos e limites de período/filtros por modalidade.
 
 ```bash
 npm --prefix frontend run build
@@ -128,7 +130,7 @@ A API recusa superusuário/BYPASSRLS, assume `coleta_app` e define a empresa na 
 
 Piloto: quatro motoristas, três carros e uma moto, com Android próprio, sem limite fixo no sistema. Cada empresa tem modalidades próprias. O rastreamento deverá estar vinculado ao turno, com indicação visível e encerramento ao terminar o trabalho.
 
-Faltam assinaturas, Android offline e execução pelo motorista, geração de coletas da rota do dia, exportações, geocodificação, rastreamento e chamados. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
+Faltam assinaturas, conclusão do Android offline, homologação da execução pelo motorista, exportações, geocodificação, rastreamento e chamados. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
 
 Antes de publicar: HTTPS, recuperação de senha, backups, monitoramento, retenção/limpeza de prévias e sessões, limite de upload no proxy e limite de login compartilhado entre instâncias. O limitador atual é em memória, por IP, para uma instância de desenvolvimento.
 
@@ -138,4 +140,15 @@ Referências: [FastAPI autenticação](https://fastapi.tiangolo.com/tutorial/sec
 
 Abra http://127.0.0.1:5173/previa-motorista.html com o painel em execução, ou abra `frontend/public/previa-motorista.html` diretamente no navegador. A página é independente da API, usa apenas dados fictícios e permite simular login, registro de modalidades e envio pendente. Não é o APK executando: os controles nativos podem variar no Android. Os dados da prévia são descartados ao recarregar.
 
-Desenvolvimento pausado a pedido do usuário após esta prévia. Próxima etapa: homologação do APK em aparelho ou emulador.
+Desenvolvimento retomado em 26/09/2026. Progresso e pendências em ROADMAP.md.
+
+
+## Execução diária unificada
+
+`POST /rotas/{rota_id}/execucoes?data=AAAA-MM-DD` prepara o dia para a operação; sem data usa hoje no fuso da empresa. `POST /motorista/rota-do-dia/preparar` prepara as rotas do motorista e retorna as execuções do dia, incluindo `coleta_id`, situação e versão de cada atendimento. O Android usa este endpoint ao atualizar. A consulta GET antiga continua sendo apenas uma prévia do planejamento recorrente atual, sem gravar dados.
+
+Cada rota/data possui uma execução imutável com motorista, versão, endereços, ordem e janelas. Repetir a preparação devolve a mesma execução. O agendamento usa o início da janela ou 08:00 no fuso da empresa quando não há janela. As modalidades ficam a informar até a coleta; o painel também pode informá-las na conclusão.
+
+A conclusão pelo motorista mantém o ID do agendamento, acrescenta volumes e evento de auditoria. Reenvio idêntico é confirmado; outro aparelho tentando concluir uma visita já finalizada recebe 409. Atualizar a rota mostra o estado atual do servidor. Alterações no planejamento recorrente só afetam novas execuções; transferência de uma execução já emitida, feriados e revisitas explícitas continuam pendentes no ROADMAP.
+
+Compatibilidade: visitas antigas já registradas em uma rota/data bloqueiam nova geração nessa combinação para exigir conferência operacional. Registros antigos e filas existentes não são apagados. Não há conversão automática desses registros nem associação automática de agendamentos avulsos. Aplicar migração 005 antes de usar o APK atualizado (o servidor de desenvolvimento aplica migrações ao iniciar).
