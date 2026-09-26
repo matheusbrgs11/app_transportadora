@@ -31,9 +31,9 @@ def register_offline(app,authenticated,staff):
         conn,user,_=auth
         # Preserve even invalid legacy payloads for staff review; never execute them as a collection.
         encoded=json.dumps(body.payload,sort_keys=True,ensure_ascii=False)
-        if len(encoded.encode())>32768 or str(body.payload.get('id_local_dispositivo'))!=str(body.id_local_dispositivo):
-            raise HTTPException(422,'Registro inválido ou maior que 32 KB.')
-        allowed={'id_local_dispositivo','coleta_id','rota_id','cliente_id','versao_rota','concluida_em','status','motivo','itens','observacoes'}
+        if len(encoded.encode())>230000 or str(body.payload.get('id_local_dispositivo'))!=str(body.id_local_dispositivo):
+            raise HTTPException(422,'Registro inválido ou maior que 230 KB.')
+        allowed={'id_local_dispositivo','coleta_id','rota_id','cliente_id','versao_rota','concluida_em','status','motivo','itens','observacoes','comprovante'}
         if set(body.payload)-allowed:
             raise HTTPException(422,'Campos não permitidos no registro.')
         digest=sha256(encoded.encode()).hexdigest()

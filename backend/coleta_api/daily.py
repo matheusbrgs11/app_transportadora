@@ -80,6 +80,7 @@ def display(conn,run,mid=None):
 
 def complete(conn,user,mid,body,response):
     payload=body.model_dump(mode='json')
+    if payload.get('comprovante') is None: payload.pop('comprovante',None)
     payload['itens']=sorted(payload['itens'],key=lambda i:i['modalidade_id'])
     digest=sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
     conn.execute('SELECT pg_advisory_xact_lock(hashtextextended(%s,0))',(str(user['empresa_id'])+str(body.id_local_dispositivo),))
@@ -115,6 +116,10 @@ def complete(conn,user,mid,body,response):
                 (user['empresa_id'],old['id'],item.modalidade_id,names[item.modalidade_id],item.quantidade,item.quantidade_status))
     conn.execute("UPDATE coletas SET status=%s,concluida_em=%s,observacoes=%s,versao=versao+1 WHERE id=%s",
                  (body.status,body.concluida_em if body.status=='concluida' else None,body.observacoes,old['id']))
+    if body.comprovante:
+        from .proofs import save_proof
+        save_proof(conn,user,old,body,names)
+        payload['comprovante']=body.comprovante.model_dump(mode='json',exclude={'imagem_png'})
     add_event(conn,user,old['id'],'agendada',body.status,body.motivo,dados=payload)
     conn.execute('INSERT INTO envios_motorista VALUES(%s,%s,%s,%s,%s,%s)',
                  (user['empresa_id'],body.id_local_dispositivo,user['id'],old['id'],digest,body.status))

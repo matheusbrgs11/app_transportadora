@@ -103,6 +103,7 @@ def collection_detail(conn,cid):
     record=conn.execute(SELECT_COLLECTION+' WHERE c.id=%s',(cid,)).fetchone()
     if not record:
         raise HTTPException(404,'Coleta não encontrada.')
+    record['tem_comprovante']=bool(conn.execute('SELECT 1 FROM comprovantes WHERE coleta_id=%s',(cid,)).fetchone())
     record['itens']=conn.execute('''SELECT i.id,i.modalidade_id,coalesce(i.modalidade_nome,m.nome) AS modalidade_nome,
         i.quantidade,i.quantidade_status FROM coleta_itens i JOIN modalidades m ON m.id=i.modalidade_id
         AND m.empresa_id=i.empresa_id WHERE i.coleta_id=%s ORDER BY modalidade_nome,i.id''',(cid,)).fetchall()

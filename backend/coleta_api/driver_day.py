@@ -6,12 +6,14 @@ from fastapi import Depends, HTTPException, Response, Query
 from uuid import UUID
 from pydantic import AwareDatetime, Field, model_validator
 from .models import StrictModel
+from .proofs import Proof
 from .daily import prepare, display, complete, route_lock
 from .collections import CollectionCreate, Item, create_collection
 
 
 class DriverVisit(StrictModel):
     coleta_id: UUID | None = None
+    comprovante: Proof | None = None
     id_local_dispositivo: UUID
     rota_id: UUID
     cliente_id: UUID
@@ -24,6 +26,8 @@ class DriverVisit(StrictModel):
 
     @model_validator(mode='after')
     def validate_collection(self):
+        if self.comprovante and (not self.coleta_id or self.status!='concluida' or abs((self.concluida_em-self.comprovante.capturado_em).total_seconds())>1800):
+            raise ValueError('Comprovante exige coleta planejada concluída e captura até 30 minutos da conclusão.')
         if self.status=='nao_atendida':
             if not self.coleta_id or self.itens or not self.motivo:
                 raise ValueError('Não atendimento exige coleta planejada e motivo, sem volumes.')

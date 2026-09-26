@@ -1,0 +1,18 @@
+import {useEffect,useState} from 'react';
+import {type Api} from './api';
+import {ErrorBox} from './ui';
+type Proof={metadados:{tipo:string;responsavel:string|null;motivo:string|null;capturado_em:string};registro:{cliente_nome:string;cliente_cnpj:string;motorista_nome:string;concluida_em:string;itens:{modalidade_nome:string;quantidade:number|null;quantidade_status:string}[]};imagem_png:string|null;sha256:string;criado_em:string};
+export default function CollectionProof({api,id,available}:{api:Api;id:string;available:boolean}){
+ const [proof,setProof]=useState<Proof|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>{setProof(null);setError('');},[id]);
+ async function load(){setBusy(true);setError('');try{setProof(await api<Proof>(`/coletas/${id}/comprovante`));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ function download(){if(!proof)return;const p=proof;const escape=(v:unknown)=>String(v??'Não informado').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+  const html=`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Comprovante de coleta</title><style>body{font:16px system-ui;max-width:760px;margin:40px auto;padding:24px}img{max-width:100%;border:1px solid #ccc}li{margin:10px 0}small{overflow-wrap:anywhere}@media print{button{display:none}}</style><h1>Comprovante de coleta</h1><p>Cliente: ${escape(p.registro.cliente_nome)} · CNPJ ${escape(p.registro.cliente_cnpj)}</p><p>Motorista: ${escape(p.registro.motorista_nome)}</p><p>Coleta: ${escape(id)}</p><p>Realização: ${escape(p.registro.concluida_em)}</p><ul>${p.registro.itens.map(i=>`<li>${escape(i.modalidade_nome)}: ${escape(i.quantidade??'não informada')} (${escape(i.quantidade_status==='confirmada'?'confirmada':'a conferir')})</li>`).join('')}</ul><p>Responsável: ${escape(p.metadados.responsavel)}</p><p>${escape(p.metadados.tipo==='assinatura'?'Rubrica capturada':p.metadados.tipo==='ausencia'?'Responsável ausente':'Recusa de assinatura')}</p><p>Captura: ${escape(p.metadados.capturado_em)}</p>${p.imagem_png?`<img alt="Rubrica registrada" src="data:image/png;base64,${escape(p.imagem_png)}">`:`<p>Justificativa: ${escape(p.metadados.motivo)}</p>`}<p>Dados preservados no registro. Consulte o histórico para correções posteriores.</p><small>Integridade do registro (SHA-256): ${escape(p.sha256)}</small><p><button onclick="window.print()">Imprimir / salvar em PDF</button></p></html>`;
+  const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`comprovante-${id}.html`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ return <section><h3>Comprovante</h3>{!available?<p>Sem comprovante registrado nesta coleta.</p>:<button className="secondary" disabled={busy} onClick={load}>{busy?'Carregando…':'Consultar comprovante'}</button>}<ErrorBox message={error}/>
+ {proof&&<><p>Responsável: {proof.metadados.responsavel||'Não informado'} · {new Date(proof.metadados.capturado_em).toLocaleString('pt-BR')}</p>
+ {proof.imagem_png?<img style={{maxWidth:'100%',width:640,border:'1px solid #ddd'}} src={'data:image/png;base64,'+proof.imagem_png} alt="Rubrica do responsável registrada na coleta"/>:<p>{proof.metadados.tipo==='ausencia'?'Responsável ausente':'Recusa de assinatura'}: {proof.metadados.motivo}</p>}
+ <p className="helper">O comprovante preserva os dados originais; correções posteriores continuam no histórico.</p><button className="secondary" onClick={download}>Baixar comprovante para impressão</button></>}
+ </section>;
+}

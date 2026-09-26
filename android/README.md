@@ -40,7 +40,7 @@ Reinicie o backend após atualizar o código para disponibilizar `/motorista/mod
 
 Teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Rascunhos de volumes e observações agora são persistidos por conta e atendimento; rascunhos da versão anterior continuam recuperáveis na primeira tentativa. Podem ser recuperados após novo login ao abrir a mesma parada; não são enviados até salvar a coleta.
 
-Ainda faltam homologação física do envio automático/desbloqueio, assinatura, rastreamento e notificações. Reabrir o processo permite acesso offline pela sessão lembrada; reiniciar o aparelho exige login online pela política adotada. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. A tela de registros permite enviar conflitos à conferência da operação.
+Ainda faltam homologação física do envio automático/desbloqueio/rubrica, rastreamento e notificações. Reabrir o processo permite acesso offline pela sessão lembrada; reiniciar o aparelho exige login online pela política adotada. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. A tela de registros permite enviar conflitos à conferência da operação.
 
 
 ## Testes econômicos sem emulador completo
@@ -87,3 +87,13 @@ Em **Registros salvos e conferências**, um conflito pode ser retentado sem modi
 Testes JVM de AES-GCM usam uma chave de teste injetada; não comprovam o hardware Keystore nem o desbloqueio do aparelho real. Testes de JobScheduler verificam registro de trabalhos, rede, persistência e backoff; execução sob Doze/rede móvel/force-stop e confirmação de credencial ainda precisam de homologação física.
 
 Validação da entrega offline: 20 testes Android Robolectric (API 28) aprovados, build APK debug e lint; 46 testes backend. Inclui fila concorrente, recuperação de estado enviando, conflitos sem reenvio automático, criptografia com chave de teste, relógio/sessão, parâmetros JobScheduler e impedimento de salvar após virada do dia sem perder rascunho. Não substitui os cenários físicos pendentes acima.
+
+## Rubrica e comprovante — migração 008
+
+A conclusão de uma coleta no novo formulário exige rubrica desenhada e nome do responsável, ou ausência/recusa com justificativa. Não atendimento não pede rubrica. Limpar/refazer remove os traços do rascunho. Nome, escolha, justificativa e traços são salvos por conta/atendimento; ao confirmar, a imagem PNG e os metadados entram no mesmo registro SQLite dos volumes. Só a confirmação completa da API marca a fila como enviada.
+
+A área gera PNG 640×240, até 128 KB, e limita pontos para não crescer indefinidamente. Captura e conclusão precisam ocorrer em um intervalo de até 30 minutos; um rascunho antigo de rubrica exige recaptura. Esse limite é entre os horários registrados, não entre captura e envio: o registro confirmado pode ser enviado depois, sem perder a rubrica.
+
+O backend armazena PNG e snapshot em tabela privada com RLS, na mesma transação da coleta. Falhas desfazem ambas; resposta perdida admite reenvio idêntico. Não há upload separado nem URL pública. O Android antigo ainda pode enviar coletas sem comprovante; esses registros são identificados como sem comprovante, sem gerar assinatura artificial. A captura de rubrica real deve ser homologada com os motoristas antes do piloto.
+
+Validação: 23 testes Android passaram, incluindo gestos/rasterização nativa simulada, limpar, restauração do rascunho, imagem preservada após resposta perdida e ausência/recusa. PNG produzido pelo teste Android foi aceito pelo validador da API. Implementação de desenho baseada na [documentação de Views do Android](https://developer.android.com/develop/ui/views/layout/custom-views/custom-drawing).

@@ -224,11 +224,12 @@ class MainActivity : Activity() {
             entries.add(Triple(m.getString("id"),selected,quantity))
         }
         val notes=field("Observações")
+        var proofEditor: ProofEditor? = null
         fun persistDraft() {
             val fields=JSONObject()
             for ((id,selected,quantity) in entries) fields.put(id,JSONObject()
                 .put("selected",selected.isChecked).put("quantity",quantity.text.toString()))
-            try { store.draft(owner,draftKey,JSONObject().put("fields",fields).put("notes",notes.text.toString())) }
+            try { store.draft(owner,draftKey,JSONObject().put("fields",fields).put("notes",notes.text.toString()).put("comprovante",proofEditor?.draft() ?: draft?.optJSONObject("comprovante") ?: JSONObject.NULL)) }
             catch (_: Exception) { message("Falha ao preservar rascunho. Não feche esta tela antes de salvar.") }
         }
         val watcher=object:TextWatcher {
@@ -247,6 +248,8 @@ class MainActivity : Activity() {
             quantity.addTextChangedListener(watcher)
         }
         notes.addTextChangedListener(watcher)
+        proofEditor=ProofEditor(this,draft?.optJSONObject("comprovante")) { persistDraft() }
+        layout.addView(proofEditor)
         text("Rascunho preservado neste aparelho. Só será enviado após salvar a coleta.")
         button("Salvar coleta no aparelho") {
             if(!saveDayAllowed(plan)) return@button
@@ -262,7 +265,8 @@ class MainActivity : Activity() {
                 items.put(JSONObject().put("modalidade_id",id).put("quantidade",count ?: JSONObject.NULL).put("quantidade_status",if(count==null) "a_conferir" else "confirmada"))
             }
             if (items.length()==0) { message("Selecione ao menos uma modalidade."); return@button }
-            val body=JSONObject().put("id_local_dispositivo",UUID.randomUUID().toString()).put("rota_id",route.getString("id"))
+            val proof=try { proofEditor!!.proof() } catch(e:Exception) { message(e.message ?: "Confira a rubrica.");return@button }
+            val body=JSONObject().put("comprovante",proof).put("id_local_dispositivo",UUID.randomUUID().toString()).put("rota_id",route.getString("id"))
                 .put("coleta_id",stop.getString("coleta_id")).put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
                 .put("concluida_em",Instant.now().toString()).put("itens",items).put("observacoes",notes.text.toString())
             try { store.saveDraftVisit(owner,draftKey,body); scheduleSync();home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }

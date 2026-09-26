@@ -55,12 +55,12 @@ Aceite: registros salvos sobrevivem aos cenários de falha, voltam ao servidor s
 
 ## 4. Implementar rubrica e comprovante
 
-- [ ] Capturar assinatura com o dedo, nome do responsável e horário; permitir limpar/refazer antes da confirmação.
-- [ ] Definir obrigatoriedade e exceções justificadas (ausência/recusa), sem inventar assinatura.
-- [ ] Salvar imagem e metadados no aparelho antes do envio; integrar à fila offline.
-- [ ] Armazenar arquivos privadamente, validar formato/tamanho e vincular de forma consistente à coleta.
-- [ ] Exibir assinatura e comprovante aos usuários autorizados no painel; preservar auditoria.
-- [ ] Testar envio parcial, repetição, acesso de outra empresa e recuperação após falha.
+- [x] Captura da rubrica com dedo, nome, horário e limpar/refazer no Android; testada com gestos e rasterização nativa simulada.
+- [x] Novo formulário Android exige rubrica com nome ou ausência/recusa justificada. API mantém compatibilidade com filas antigas sem comprovante; painel identifica registros sem comprovante.
+- [x] Rascunho de traços/metadados e imagem PNG confirmada preservados no SQLite; imagem e coleta viajam no mesmo payload imutável da fila.
+- [x] PNG privado no PostgreSQL com RLS, limite de 128 KB/1024×512, estrutura/CRC/descompressão limitada validados e gravação atômica com coleta. Comprovante append-only por coleta.
+- [x] Consulta administrativa autenticada, rubrica/justificativa e download HTML autocontido para impressão/salvar PDF pelo navegador. Snapshot original e hash preservados; imagens não são copiadas para eventos.
+- [x] Testes de PNG inválido/truncado, reenvio, isolamento, resposta perdida e rollback após gravar comprovante. Interoperabilidade PNG Android → validador API conferida. Homologação física permanece na etapa 1.
 
 Aceite: comprovante correto recuperável, sem imagem pública nem perda após confirmação local. Revisão jurídica do texto e uso do comprovante na etapa 9; não presumir validade jurídica apenas pela captura.
 
@@ -154,3 +154,5 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 26/09/2026: concluído o passo solicitado de operação diária (etapa 2 deste plano): exceções por data auditadas, transferência de pendentes, revisitas encadeadas, não atendimento offline, progresso e histórico próprio diário/semanal. Migração 006 aplicada no banco privado local. Validação: 43 testes backend, 12 testes Robolectric (incluindo tela de revisita/não atendimento), build web, APK debug e lint aprovados. Mantidos pendentes homologação real, resolução assistida de conflitos e demais etapas. Próxima implementação: completar operação offline (etapa 3); homologação física da etapa 1 continua necessária.
 
 - 26/09/2026: entrega de operação offline: sessão lembrada de até 12 horas, AES-GCM/Keystore e desbloqueio Android; JobScheduler com rede/backoff e recuperação de envios interrompidos; conflitos com retentativa explícita, conferência auditada no painel e resposta ao motorista. Migração 007 aplicada apenas no banco local. Validação: 46 testes backend e 20 testes Android Robolectric aprovados, incluindo concorrência manual/background, criptografia com chave de teste, política de expiração/relógio/reinício, configuração do agendador e tela na virada do dia. Build web, APK e lint aprovados. Corrigida compatibilidade Closeable do SQLiteOpenHelper em Android antigo. Etapa 3 ainda requer homologação física de rede/Doze/force-stop/Keystore/desbloqueio e fluxo ponta a ponta. Próxima implementação independente: rubrica e comprovante (etapa 4).
+
+- 26/09/2026: rubrica e comprovantes implementados (migração 008). Novo formulário exige assinatura ou exceção justificada; rascunho e imagem preservados offline. PostgreSQL guarda PNG privado atomicamente com a coleta; painel consulta e exporta HTML imprimível com snapshot original. Compatibilidade de reenvio de filas antigas preservada. Validação: 50 testes backend, 23 testes Android (incluindo rasterização nativa simulada), build web, APK e lint aprovados; PNG produzido pelo Android aceito pelo validador real da API. Sem homologação física nem publicação em nuvem. Próxima implementação: localizar clientes e navegação (etapa 5).

@@ -59,7 +59,7 @@ def test_conflict_validation_and_cross_client_link(context,customer):
     h,dh,body,_=prepare(context,customer)
     run,body=issue(client,h,body)
     request={'id_local_dispositivo':body['id_local_dispositivo'],'payload':body}
-    for payload in ({**body,'id_local_dispositivo':str(uuid4())},{**body,'senha':'secret'}, {**body,'observacoes':'x'*33000}):
+    for payload in ({**body,'id_local_dispositivo':str(uuid4())},{**body,'senha':'secret'}, {**body,'observacoes':'x'*230001}):
         assert client.post('/motorista/conflitos',headers=dh,json={**request,'payload':payload}).status_code==422
     cid=client.post('/motorista/conflitos',headers=dh,json=request).json()['id']
     other=next(p['coleta_id'] for p in run['paradas'] if p['coleta_id']!=body['coleta_id'])

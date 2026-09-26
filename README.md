@@ -130,7 +130,7 @@ A API recusa superusuário/BYPASSRLS, assume `coleta_app` e define a empresa na 
 
 Piloto: quatro motoristas, três carros e uma moto, com Android próprio, sem limite fixo no sistema. Cada empresa tem modalidades próprias. O rastreamento deverá estar vinculado ao turno, com indicação visível e encerramento ao terminar o trabalho.
 
-Faltam assinaturas, conclusão do Android offline, homologação da execução pelo motorista, exportações, geocodificação, rastreamento e chamados. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
+Faltam homologação Android em aparelho, exportações gerais do histórico, geocodificação, rastreamento e chamados. Rubrica, comprovante e operação offline estão implementados e aguardam homologação física. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
 
 Antes de publicar: HTTPS, recuperação de senha, backups, monitoramento, retenção/limpeza de prévias e sessões, limite de upload no proxy e limite de login compartilhado entre instâncias. O limitador atual é em memória, por IP, para uma instância de desenvolvimento.
 
@@ -174,3 +174,13 @@ O Android pode lembrar a sessão do motorista por até 12 horas, protegida pelo 
 Em **Coletas → Conferências offline**, a operação consulta registros recusados enviados pelo motorista e registra a decisão sem sobrescrever o original. É possível vincular uma coleta do mesmo cliente. A decisão, usuário e horário ficam armazenados; conferências encerradas continuam consultáveis. Encerrar a conferência não conclui nem corrige uma coleta automaticamente. O motorista consulta a resposta na tela de registros salvos.
 
 Migração 007 cria a fila de conferências com isolamento por empresa e impede atualização do payload pelo papel da API. Endpoints: `POST /motorista/conflitos`, `GET /motorista/conflitos/{id_local}`, `GET /conflitos` e `POST /conflitos/{id}/resolver`. O iniciador local aplica a migração; nenhum banco Supabase foi alterado.
+
+## Rubrica e comprovantes
+
+Em **Coletas → Detalhes → Comprovante**, usuários administrativos podem consultar a rubrica ou justificativa de ausência/recusa e baixar um HTML autocontido para imprimir ou salvar como PDF pelo navegador. O documento preserva os dados da coleta no momento da captura; correções posteriores de volumes permanecem no histórico, sem reescrever o comprovante.
+
+A migração 008 guarda PNG e metadados privadamente no próprio PostgreSQL, usando RLS por empresa e permissões de inserção/leitura sem edição do comprovante. Isso permite uma única transação para coleta + comprovante, sem serviço externo de arquivos nesta etapa. Antes da produção, dimensionar banco/backup/retenção no Supabase conforme a etapa 9. Nenhum dado foi enviado à nuvem.
+
+A API valida PNG RGB/RGBA de 8 bits, não entrelaçado, até 128 KB e 1024×512, com CRC e descompressão limitada. Imagens não entram nos eventos de auditoria. O endpoint `GET /coletas/{id}/comprovante` exige autenticação administrativa, isola empresas e retorna `Cache-Control: no-store`. O hash SHA-256 cobre metadados, snapshot serializado e PNG; não representa validação da identidade de quem desenhou. Revisão do texto/uso do comprovante continua prevista na etapa 9.
+
+A política do novo Android exige rubrica com nome ou exceção justificada. A API mantém filas antigas e cadastros administrativos sem comprovante por compatibilidade, exibindo essa ausência explicitamente. Não adiciona rubricas retroativas. Os envios antigos preservam o mesmo hash de idempotência.

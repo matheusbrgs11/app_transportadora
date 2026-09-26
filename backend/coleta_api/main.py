@@ -23,6 +23,7 @@ from .collections import register_collections
 from .driver_day import register_driver_day
 from .daily import register_daily
 from .offline import register_offline
+from .proofs import register_proofs
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -221,6 +222,7 @@ def create_app(settings: Settings | None = None):
         query = sql.SQL('UPDATE clientes SET {} WHERE id=%s RETURNING '+CLIENT_SELECT).format(sql.SQL(',').join(assignments))
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
+    register_proofs(app,staff)
     register_offline(app,authenticated,staff)
     register_daily(app,staff)
     register_driver_day(app,authenticated)
