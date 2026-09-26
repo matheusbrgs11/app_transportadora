@@ -5,11 +5,13 @@ import org.json.JSONObject
 /** A single account's immutable outbox. A conflict must not block unrelated visits. */
 class VisitSync(private val store: Store, private val owner: String,
                 private val send: (JSONObject) -> JSONObject) {
-    fun run(): Int {
+    fun run(): Int = synchronized(lock) {
+        store.recoverSending(owner)
         var sent = 0
-        for (record in store.visits(owner).filter { it.getString("state") != "sent" }) {
+        for (record in store.visits(owner).filter { it.getString("state") == "pending" }) {
             val id = record.getString("id")
             try {
+                store.state(owner,id,"sending")
                 val body = record.getJSONObject("body")
                 val receipt = send(body)
                 // Never acknowledge a redirect, empty response or malformed success as delivery.
@@ -27,6 +29,7 @@ class VisitSync(private val store: Store, private val owner: String,
                 throw e
             }
         }
-        return sent
+        sent
     }
+    companion object { private val lock=Any() }
 }

@@ -50,4 +50,23 @@ class DailyUiTest {
         assertFalse(buttons().any { it.text.toString().startsWith("Registrar coleta") })
         controller.pause().stop().destroy(); store.close(); context.deleteDatabase("coleta.db")
     }
+    @Test fun dayRolloverBlocksSavingButKeepsTheDraft() {
+        val context=RuntimeEnvironment.getApplication();context.deleteDatabase("coleta.db")
+        val controller=Robolectric.buildActivity(MainActivity::class.java).setup();val a=controller.get()
+        val id=UUID.randomUUID().toString()
+        val plan=JSONObject().put("data",LocalDate.now(java.time.ZoneId.of("UTC")).minusDays(1).toString()).put("fuso_horario","UTC")
+        val route=JSONObject().put("id",UUID.randomUUID().toString()).put("versao",1)
+        val stop=JSONObject().put("coleta_id",id).put("cliente_id",UUID.randomUUID().toString()).put("nome","Cliente").put("tentativa",1)
+        set(a,"owner","a")
+        MainActivity::class.java.getDeclaredMethod("notAttended",JSONObject::class.java,JSONObject::class.java,JSONObject::class.java)
+            .apply { isAccessible=true }.invoke(a,plan,route,stop)
+        views(a.findViewById(android.R.id.content)).filterIsInstance<EditText>().single().setText("Preservar motivo")
+        views(a.findViewById(android.R.id.content)).filterIsInstance<Button>().single { it.text.toString().startsWith("Salvar não atendimento") }.performClick()
+        Store(context).use { store ->
+            assertTrue(store.visits("a").isEmpty())
+            assertEquals("Preservar motivo",store.draft("a",id+"|nao_atendida")!!.getString("motivo"))
+        }
+        controller.pause().stop().destroy();context.deleteDatabase("coleta.db")
+    }
+
 }

@@ -123,4 +123,45 @@ class OfflineTest {
         assertEquals(1,VisitSync(store,"a") { receipt().put("id",visit.getString("coleta_id")) }.run())
     }
 
+    @Test fun interruptedSendingIsRecoveredWithoutChangingPayload() {
+        val visit=body();store.save("a",visit)
+        store.state("a",visit.getString("id_local_dispositivo"),"sending")
+        store.close();store=Store(context)
+        assertEquals(1,VisitSync(store,"a") { assertEquals(visit.toString(),it.toString());receipt() }.run())
+        assertEquals("sent",store.visits("a").single().getString("state"))
+    }
+    @Test fun conflictsAreNotAutomaticallyRetriedButExplicitRetryIsPossible() {
+        val visit=body();store.save("a",visit)
+        store.state("a",visit.getString("id_local_dispositivo"),"conflict","Conferir")
+        assertEquals(0,VisitSync(store,"a") { fail("Conflito exige intervenção");receipt() }.run())
+        store.state("a",visit.getString("id_local_dispositivo"),"pending")
+        assertEquals(1,VisitSync(store,"a") { receipt() }.run())
+    }
+    @Test fun foregroundAndBackgroundDoNotSendTheSameOutboxTwice() {
+        val visit=body();store.save("a",visit)
+        val started=java.util.concurrent.CountDownLatch(1)
+        val release=java.util.concurrent.CountDownLatch(1)
+        val calls=java.util.concurrent.atomic.AtomicInteger()
+        val executor=java.util.concurrent.Executors.newFixedThreadPool(2)
+        val other=Store(context)
+        try {
+            val first=executor.submit<Int> { VisitSync(store,"a") {
+                calls.incrementAndGet();started.countDown();check(release.await(5,java.util.concurrent.TimeUnit.SECONDS));receipt()
+            }.run() }
+            assertTrue(started.await(5,java.util.concurrent.TimeUnit.SECONDS))
+            val second=executor.submit<Int> { VisitSync(other,"a") { calls.incrementAndGet();receipt() }.run() }
+            release.countDown()
+            assertEquals(1,first.get(5,java.util.concurrent.TimeUnit.SECONDS)+second.get(5,java.util.concurrent.TimeUnit.SECONDS))
+            assertEquals(1,calls.get())
+        } finally { release.countDown();executor.shutdownNow();other.close() }
+    }
+    @Test fun reviewAndResolvedRecordsRemainStoredAndAreNotResent() {
+        val visit=body();store.save("a",visit)
+        for(state in listOf("review","resolved")) {
+            store.state("a",visit.getString("id_local_dispositivo"),state,"Decisão registrada")
+            assertEquals(0,VisitSync(store,"a") { fail("Não reenviar conferência");receipt() }.run())
+            assertEquals(visit.toString(),store.visits("a").single().getJSONObject("body").toString())
+        }
+    }
+
 }

@@ -7,6 +7,7 @@ class Settings:
     database_url: str
     jwt_secret: str
     token_minutes: int = 60
+    driver_token_minutes: int = 720
 
     @classmethod
     def from_env(cls):

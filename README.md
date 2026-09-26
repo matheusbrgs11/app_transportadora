@@ -166,3 +166,11 @@ Uma revisita é uma nova tentativa na **mesma data e execução**, autorizada pe
 O histórico administrativo expõe `tentativa` e `revisita_de`, e preserva eventos das intervenções. O motorista consulta apenas os próprios atendimentos por dia/semana, com paginação e sem dados comerciais dos clientes. O resumo inclui todas as tentativas, não clientes únicos.
 
 Endpoints adicionais: `GET /rotas/{id}/execucoes?data=...`, `PUT /rotas/{id}/excecoes/{data}`, `POST /coletas/{id}/transferir`, `POST /coletas/{id}/revisitas` e `GET /motorista/historico`. O OpenAPI local documenta os campos. Migração 006 aplicada pelo iniciador local; nenhuma migração em Supabase foi executada.
+
+## Operação offline e conferências
+
+O Android pode lembrar a sessão do motorista por até 12 horas, protegida pelo Android Keystore e pelo bloqueio do aparelho. A fila envia automaticamente quando o sistema disponibiliza rede/execução, com retentativas progressivas; o botão manual continua disponível. Reabrir o app permite desbloqueio offline; reiniciar o aparelho ou expirar a sessão exige novo login. Confira política e limitações em `android/README.md`.
+
+Em **Coletas → Conferências offline**, a operação consulta registros recusados enviados pelo motorista e registra a decisão sem sobrescrever o original. É possível vincular uma coleta do mesmo cliente. A decisão, usuário e horário ficam armazenados; conferências encerradas continuam consultáveis. Encerrar a conferência não conclui nem corrige uma coleta automaticamente. O motorista consulta a resposta na tela de registros salvos.
+
+Migração 007 cria a fila de conferências com isolamento por empresa e impede atualização do payload pelo papel da API. Endpoints: `POST /motorista/conflitos`, `GET /motorista/conflitos/{id_local}`, `GET /conflitos` e `POST /conflitos/{id}/resolver`. O iniciador local aplica a migração; nenhum banco Supabase foi alterado.

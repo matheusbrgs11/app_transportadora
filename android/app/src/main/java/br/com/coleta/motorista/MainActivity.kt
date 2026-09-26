@@ -2,6 +2,9 @@ package br.com.coleta.motorista
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.KeyguardManager
+import android.content.Intent
+import android.os.SystemClock
 import android.os.Bundle
 import android.text.InputType
 import android.text.TextWatcher
@@ -25,7 +28,43 @@ class MainActivity : Activity() {
     private var owner = ""
     private var day: JSONObject? = null
     private var busy = false
-    override fun onCreate(state: Bundle?) { super.onCreate(state); store = Store(this); login() }
+    private var session: JSONObject? = null
+    private lateinit var vault: SessionVault
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state); store = Store(this); vault=SessionVault(this)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        if (vault.valid()!=null) unlockSaved() else login()
+    }
+    @Suppress("DEPRECATION")
+    private fun unlockSaved() {
+        page("Desbloquear acesso salvo")
+        text("Confirme o bloqueio do aparelho para acessar a rota offline. A sessão dura até 12 horas; reiniciar o aparelho exige novo login.")
+        button("Desbloquear") {
+            val intent=getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent("Coleta","Confirme para abrir sua rota")
+            if(intent!=null) startActivityForResult(intent,41) else { vault.clear();login() }
+        }
+        button("Entrar com outra conta") { vault.clear();SyncScheduler.cancel(this);login() }
+    }
+    @Deprecated("Legacy activity result supports Android 8")
+    override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode==41 && resultCode==RESULT_OK) {
+            val saved=vault.valid()
+            if(saved==null) { login();return }
+            session=saved;owner=saved.getString("owner");api=Api(saved.getString("base"),saved.getString("token"))
+            day=store.cached(owner);scheduleSync();home()
+        }
+    }
+    private fun sessionAllowed(): Boolean {
+        val current=session ?: return true
+        if(SessionPolicy.valid(current,System.currentTimeMillis(),SystemClock.elapsedRealtime(),vault.boot()) && (!current.optBoolean("remember") || vault.valid()?.optString("token")==current.getString("token"))) return true
+        session=null;login();message("Acesso local expirado ou relógio alterado. Entre novamente; seus registros estão preservados.")
+        return false
+    }
+    private fun scheduleSync() {
+        if(vault.valid()!=null) runCatching { SyncScheduler.schedule(this) }
+            .onFailure { message("Envio automático indisponível. Use Enviar registros salvos.") }
+    }
     private fun page(title: String) {
         layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24,48,24,32) }
         setContentView(ScrollView(this).apply { addView(layout) })
@@ -44,7 +83,7 @@ class MainActivity : Activity() {
         }
     }
     private fun button(label: String, action: () -> Unit) = Button(this).also {
-        it.text = label; it.setOnClickListener { if (!busy) action() }; layout.addView(it)
+        it.text = label; it.setOnClickListener { if (!busy && sessionAllowed()) action() }; layout.addView(it)
     }
     private fun message(value: String) { AlertDialog.Builder(this).setMessage(value).setPositiveButton("OK",null).show() }
     private fun background(work: () -> Unit, done: () -> Unit) {
@@ -54,6 +93,10 @@ class MainActivity : Activity() {
             runOnUiThread {
                 busy = false
                 if (!isDestroyed) {
+                    if (failure is ApiError && failure.status==401) {
+                        api?.let { vault.clear(owner,it.token) };SyncScheduler.cancel(this@MainActivity);session=null;login()
+                        message(failure.message ?: "Entre novamente.");return@runOnUiThread
+                    }
                     if (failure != null) message(failure.message ?: "Não foi possível conectar. Os registros salvos foram preservados.")
                     done()
                 }
@@ -61,13 +104,19 @@ class MainActivity : Activity() {
         }
     }
     private fun login() {
-        api = null; owner = ""; day = null
+        api = null; owner = ""; day = null; session=null
         page("Coleta • Motorista")
         text("Entre com o acesso fornecido pela transportadora.")
         val server = field("Servidor da transportadora")
         val company = field("Código da empresa")
         val username = field("Usuário")
         val password = field("Senha", true)
+        val remember=CheckBox(this).apply {
+            text="Manter acesso offline e envio automático por até 12 horas"
+            isEnabled=getSystemService(KeyguardManager::class.java).isDeviceSecure
+            isChecked=isEnabled
+        };layout.addView(remember)
+        if(!remember.isEnabled) text("Configure PIN ou senha de bloqueio do Android para manter acesso e envio automático após fechar o app.")
         button("Entrar") {
             val base = server.text.toString().trim().trimEnd('/')
             val uri = runCatching { URI(base) }.getOrNull()
@@ -75,6 +124,7 @@ class MainActivity : Activity() {
                 message("Informe uma URL válida do servidor."); return@button
             }
             val body = JSONObject().put("empresa_id",company.text.toString().trim()).put("usuario_login",username.text.toString().trim()).put("senha",password.text.toString())
+            val persist=remember.isChecked
             password.text.clear()
             background({
                 val service = Api(base)
@@ -85,8 +135,10 @@ class MainActivity : Activity() {
                     service.request("/auth/logout",JSONObject()); error("Este aplicativo é exclusivo para motoristas.")
                 }
                 val key = base + "|" + user.getString("empresa_id") + "|" + user.getString("id")
-                owner = key; api = service; day = store.cached(key)
-            }, { if (api != null) { home(); refresh() } })
+                val saved=SessionPolicy.create(base,key,service.token,result.getLong("expires_in"),vault.boot()).put("remember",persist)
+                if(persist) vault.save(saved) else { vault.clear();SyncScheduler.cancel(this@MainActivity) }
+                session=saved;owner = key; api = service; day = store.cached(key)
+            }, { if (api != null) { scheduleSync();home(); refresh() } })
         }
     }
     private fun refresh() {
@@ -100,14 +152,21 @@ class MainActivity : Activity() {
     private fun home() {
         page("Minha rota")
         val records = store.visits(owner)
-        text("${records.count { it.getString("state") != "sent" }} registros aguardando envio")
+        text("${records.count { it.getString("state") in listOf("pending","sending") }} aguardando envio • ${records.count { it.getString("state") in listOf("conflict","review") }} em conferência")
+        text(if(vault.valid()!=null) "Envio automático habilitado enquanto a sessão estiver válida; o Android define quando executar." else "Envio manual disponível nesta sessão.")
+        button("Registros salvos e conferências") { outbox() }
         button("Meu histórico • hoje") { history(days = 1) }
         button("Meu histórico • últimos 7 dias") { history() }
         button("Atualizar rota") { refresh() }
         button("Enviar registros salvos") { sync() }
         button("Sair / entrar novamente") {
             val service = api
-            background({ runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
+            val pending=records.count { it.getString("state") !in listOf("sent","resolved") }
+            AlertDialog.Builder(this).setMessage("Sair? $pending registros permanecem no aparelho. O envio automático será pausado até novo login nesta conta.")
+                .setNegativeButton("Continuar trabalhando",null).setPositiveButton("Sair") { _,_ ->
+                    vault.clear();SyncScheduler.cancel(this);session=null
+                    background({ runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
+                }.show()
         }
         val plan = day
         if (plan == null) { text("Conecte-se e atualize para carregar sua rota."); return }
@@ -190,6 +249,7 @@ class MainActivity : Activity() {
         notes.addTextChangedListener(watcher)
         text("Rascunho preservado neste aparelho. Só será enviado após salvar a coleta.")
         button("Salvar coleta no aparelho") {
+            if(!saveDayAllowed(plan)) return@button
             if (stop.isNull("coleta_id")) {
                 message("Atualize a rota antes de registrar esta coleta. O rascunho foi preservado."); return@button
             }
@@ -205,9 +265,14 @@ class MainActivity : Activity() {
             val body=JSONObject().put("id_local_dispositivo",UUID.randomUUID().toString()).put("rota_id",route.getString("id"))
                 .put("coleta_id",stop.getString("coleta_id")).put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
                 .put("concluida_em",Instant.now().toString()).put("itens",items).put("observacoes",notes.text.toString())
-            try { store.saveDraftVisit(owner,draftKey,body); home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
+            try { store.saveDraftVisit(owner,draftKey,body); scheduleSync();home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
         }
         button("Voltar • manter rascunho") { home() }
+    }
+    private fun saveDayAllowed(plan: JSONObject): Boolean {
+        if(LocalDate.now(ZoneId.of(plan.getString("fuso_horario"))).toString()==plan.getString("data")) return true
+        message("O dia da rota mudou. Rascunho preservado; atualize a rota antes de registrar outro atendimento.")
+        return false
     }
     private fun draftKey(plan: JSONObject, route: JSONObject, stop: JSONObject): String {
         val legacy = plan.getString("data") + "|" + route.getString("id") + "|" + stop.getString("cliente_id")
@@ -230,6 +295,7 @@ class MainActivity : Activity() {
             }
         })
         button("Salvar não atendimento no aparelho") {
+            if(!saveDayAllowed(plan)) return@button
             val value = reason.text.toString().trim()
             if (value.isEmpty() || value.length>1000 || stop.isNull("coleta_id")) {
                 message("Informe um motivo de até 1.000 caracteres e use uma rota atualizada."); return@button
@@ -239,7 +305,7 @@ class MainActivity : Activity() {
                 .put("versao_rota",route.getInt("versao")).put("cliente_id",stop.getString("cliente_id"))
                 .put("concluida_em",Instant.now().toString()).put("status","nao_atendida")
                 .put("motivo",value).put("itens",JSONArray())
-            try { store.saveDraftVisit(owner,key,body); home(); sync() }
+            try { store.saveDraftVisit(owner,key,body); scheduleSync();home(); sync() }
             catch (_:Exception) { message("Falha ao salvar. Mantenha esta tela e tente novamente.") }
         }
         button("Voltar • manter rascunho") { home() }
@@ -273,10 +339,46 @@ class MainActivity : Activity() {
             button("Voltar para minha rota") { home() }
         })
     }
+    private fun outbox() {
+        page("Registros salvos e conferências")
+        val records=store.visits(owner)
+        if(records.isEmpty()) text("Nenhum registro salvo nesta conta.")
+        for(record in records) {
+            val id=record.getString("id");val state=record.getString("state");val body=record.getJSONObject("body")
+            val label=when(state) { "pending"->"Pendente";"sending"->"Enviando";"sent"->"Enviado";"review"->"Em conferência";"resolved"->"Conferido pela operação";else->"Conflito" }
+            text("${body.optString("concluida_em")} • $label",20f)
+            text("${body.optString("status","concluida")} · ${body.optString("motivo",body.optString("observacoes"))}")
+            if(record.optString("error").isNotBlank()) text(record.getString("error"))
+            if(state=="conflict") {
+                button("Retentar este registro") { store.state(owner,id,"pending");scheduleSync();sync() }
+                button("Enviar este registro para conferência") {
+                    val service=api ?: return@button
+                    background({
+                        val result=service.request("/motorista/conflitos",JSONObject().put("id_local_dispositivo",id).put("payload",body))
+                        check(result.optString("status") in listOf("aberto","resolvido")) { "Confirmação inválida. Registro preservado." }
+                        UUID.fromString(result.getString("id"))
+                        store.state(owner,id,"review","Aguardando conferência da operação. Conteúdo original preservado.")
+                    }, { outbox() })
+                }
+            }
+            if(state=="review") button("Consultar resposta da operação") {
+                val service=api ?: return@button
+                background({
+                    val result=service.request("/motorista/conflitos/$id")
+                    if(result.getString("status")=="resolvido") store.state(owner,id,"resolved",result.getString("resolucao"))
+                }, { outbox() })
+            }
+        }
+        button("Voltar para minha rota") { home() }
+    }
     private fun sync() {
         val service=api ?: return
         background({
-            VisitSync(store, owner) { body -> service.request("/motorista/coletas", body) }.run()
+            VisitSync(store, owner) { body ->
+                val current=session
+                check(current==null || SessionPolicy.valid(current,System.currentTimeMillis(),SystemClock.elapsedRealtime(),vault.boot())) { "Sessão local expirada. Entre novamente." }
+                service.request("/motorista/coletas", body)
+            }.run()
         }, { home() })
     }
     override fun onDestroy() { super.onDestroy(); executor.shutdown() }

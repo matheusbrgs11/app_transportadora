@@ -9,8 +9,8 @@ Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sist
 - Cache da rota e modalidades em SQLite privado. A tela informa a data e impede novas visitas usando um planejamento de outro dia.
 - Seleção de várias modalidades e quantidade inteira; campo vazio significa `a_conferir`.
 - Cada visita recebe um UUID e é gravada primeiro em SQLite. Somente a confirmação HTTP marca o registro como enviado. Falha de rede ou rejeição preserva o conteúdo original e mostra o erro.
-- Envio após salvar e botão para tentar novamente. Cache e fila separados por servidor, empresa e usuário.
-- Sessão somente em memória; não armazena senha/token. Reiniciar o processo exige novo login online. Após autenticar na mesma conta, os registros pendentes reaparecem. A sessão expirada exige novo login para enviar.
+- Envio após salvar, botão manual e JobScheduler com rede obrigatória, repetição exponencial e verificação periódica. Cache e fila separados por servidor, empresa e usuário.
+- Sessão de até 12 horas. A opção de lembrar acesso guarda o token com AES-GCM/Android Keystore, sem guardar senha, e exige bloqueio seguro do aparelho. Reabrir o processo permite desbloquear com a credencial Android, inclusive offline. Expiração, reinício do aparelho ou alteração relevante do relógio exigem novo login. A fila é preservada.
 - Backup Android desativado. Versão principal exige HTTPS; apenas debug permite HTTP para desenvolvimento.
 
 ## Compilar sem Android Studio
@@ -40,7 +40,7 @@ Reinicie o backend após atualizar o código para disponibilizar `/motorista/mod
 
 Teste no aparelho; perda de rede durante envio; encerramento do processo com pendências; troca de contas; resposta perdida após gravação no servidor; tela pequena/teclado; rotação durante formulário. Rascunhos de volumes e observações agora são persistidos por conta e atendimento; rascunhos da versão anterior continuam recuperáveis na primeira tentativa. Podem ser recuperados após novo login ao abrir a mesma parada; não são enviados até salvar a coleta.
 
-Ainda faltam sincronização automática em segundo plano, login offline após reiniciar, assinatura, ferramenta de resolução dos conflitos, rastreamento e notificações. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. Não há ferramenta de resolução desse conflito nesta primeira versão.
+Ainda faltam homologação física do envio automático/desbloqueio, assinatura, rastreamento e notificações. Reabrir o processo permite acesso offline pela sessão lembrada; reiniciar o aparelho exige login online pela política adotada. Nas novas execuções, o planejamento é preservado mesmo que a rota recorrente mude. Filas antigas sem coleta_id podem exigir conferência operacional, mantendo os registros. A tela de registros permite enviar conflitos à conferência da operação.
 
 
 ## Testes econômicos sem emulador completo
@@ -49,7 +49,7 @@ Execute `../scripts/test-android.sh` a partir desta pasta. Robolectric simula AP
 
 Em 26/09/2026, 8 testes passaram na API 28, com APK recompilado e lint executado. Os testes cobrem armazenamento SQLite, isolamento, migração, confirmação de envio e recuperação de falhas. Não equivalem a homologação visual, GPS, bateria, sincronização automática ou Android → API real → painel.
 
-Conflitos 403/404/409/422 preservam o registro como `conflict` e deixam os demais seguirem. O botão de envio tenta novamente os registros não confirmados; falhas de rede e autenticação interrompem o lote sem excluir dados. Uma resposta sem confirmação válida não marca a coleta como enviada.
+Conflitos 403/404/409/422 preservam o registro como `conflict` e deixam os demais seguirem. A sincronização envia apenas pendentes; conflitos exigem retentativa explícita ou envio à conferência. falhas de rede e autenticação interrompem o lote sem excluir dados. Uma resposta sem confirmação válida não marca a coleta como enviada.
 
 Ao atualizar a rota, o app prepara os atendimentos diários e recebe IDs estáveis. O registro envia `coleta_id` e conclui a mesma coleta exibida no painel. Visitas finalizadas no servidor aparecem sem botão de nova coleta após atualização. Exige backend com migração 006.
 
@@ -65,3 +65,25 @@ Ao atualizar a rota, o app prepara os atendimentos diários e recebe IDs estáve
 Teste de tela Robolectric: primeira tentativa concluída, revisita disponível, preenchimento do motivo e gravação offline pela interface. Ainda não é validação ponta a ponta com servidor real ou homologação em aparelho.
 
 Validação final desta entrega: 12 testes Robolectric aprovados (11 de armazenamento/sincronização e 1 de tela), APK debug e lint aprovados. Backend correspondente: 43 testes de integração aprovados.
+
+## Sessão e sincronização automática
+
+O login do motorista dura 12 horas; a equipe administrativa continua com 1 hora. A renovação exige senha novamente, sem refresh token ou extensão silenciosa. O app limita o prazo usando relógio civil e monotônico; reinício do aparelho e diferença maior que cinco minutos entre eles bloqueiam o acesso salvo. Ajuste indevido do relógio não estende a sessão local. O payload pendente continua intacto para envio após autenticação.
+
+Lembrar sessão requer PIN/padrão/senha do Android. O token usa AES-GCM com chave não exportável do Android Keystore; a senha nunca é persistida. Desbloqueio usa a confirmação de credencial do sistema, compatível com Android 8. O cache/fila fica no armazenamento privado do aplicativo, protegido pelo Android, sem backup. O SQLite não usa criptografia própria. Perder a chave da sessão exige novo login; não apaga SQLite.
+
+Sem sessão lembrada, o envio funciona manualmente enquanto o app estiver autenticado. Com sessão lembrada, são agendados um trabalho com rede obrigatória e retentativa exponencial (início de 30 segundos), e uma verificação periódica (intervalo solicitado de 15 minutos). O sistema decide o momento real; economia de bateria, quotas e encerramento forçado podem atrasar a execução. Após force-stop, abrir o app novamente é necessário. O código usa um executor de background e serializa envios manuais/automáticos no mesmo processo. Não adiciona serviço contínuo de localização.
+
+A fila registra `sending` antes da rede. Reabrir recupera envios interrompidos como pendentes, conservando o mesmo UUID/payload. Confirmação válida exige o mesmo atendimento e status; resposta perdida é reenviada idempotentemente. Falhas de rede/servidor mantêm pendência; 401 interrompe e exige login. Conflitos não são repetidos automaticamente.
+
+Sair apaga a sessão local e cancela trabalhos, preservando dados por conta. O servidor revoga a sessão quando a chamada de logout chega; sem rede, a credencial remota expira no prazo original. Revogação remota não pode ser detectada sem comunicação: o app a aplica quando recebe 401. Uma requisição já enviada antes do logout pode terminar, com deduplicação no servidor.
+
+Fontes técnicas: [JobInfo](https://developer.android.com/reference/android/app/job/JobInfo.Builder), [JobService](https://developer.android.com/reference/android/app/job/JobService), [Android Keystore AES-GCM](https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec), [confirmação de credencial](https://developer.android.com/reference/android/app/KeyguardManager).
+
+## Conferência de conflitos
+
+Em **Registros salvos e conferências**, um conflito pode ser retentado sem modificar o original ou enviado ao painel. Em **Coletas → Conferências offline**, a operação confere o payload e registra uma decisão, com vínculo opcional a uma coleta do mesmo cliente. Isso não altera volumes/status da coleta automaticamente: correções são feitas no fluxo de Coletas. O motorista consulta a resposta; o registro passa a conferido e continua no aparelho. Exige migração 007.
+
+Testes JVM de AES-GCM usam uma chave de teste injetada; não comprovam o hardware Keystore nem o desbloqueio do aparelho real. Testes de JobScheduler verificam registro de trabalhos, rede, persistência e backoff; execução sob Doze/rede móvel/force-stop e confirmação de credencial ainda precisam de homologação física.
+
+Validação da entrega offline: 20 testes Android Robolectric (API 28) aprovados, build APK debug e lint; 46 testes backend. Inclui fila concorrente, recuperação de estado enviando, conflitos sem reenvio automático, criptografia com chave de teste, relógio/sessão, parâmetros JobScheduler e impedimento de salvar após virada do dia sem perder rascunho. Não substitui os cenários físicos pendentes acima.

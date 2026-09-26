@@ -22,6 +22,7 @@ from .operations import register_operations
 from .collections import register_collections
 from .driver_day import register_driver_day
 from .daily import register_daily
+from .offline import register_offline
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -114,12 +115,13 @@ def create_app(settings: Settings | None = None):
             if not user or not valid:
                 raise HTTPException(401,'Empresa, usuário ou senha inválidos.')
             issued = datetime.now(timezone.utc)
-            expires = issued+timedelta(minutes=settings.token_minutes)
+            duration=settings.driver_token_minutes if user['perfil']=='motorista' else settings.token_minutes
+            expires = issued+timedelta(minutes=duration)
             session = conn.execute('INSERT INTO sessoes(empresa_id,usuario_id,expira_em) VALUES (%s,%s,%s) RETURNING id',
                 (user['empresa_id'],user['id'],expires)).fetchone()
             token = jwt.encode({'sub':str(user['id']),'empresa_id':str(user['empresa_id']),'jti':str(session['id']),
                 'iat':issued,'exp':expires,'iss':'coleta-api','aud':'coleta'},settings.jwt_secret,algorithm='HS256')
-            return {'access_token':token,'token_type':'bearer','expires_in':settings.token_minutes*60,
+            return {'access_token':token,'token_type':'bearer','expires_in':duration*60,
                     'usuario':{k:user[k] for k in ('id','empresa_id','nome','perfil')}}
 
     @app.get('/auth/me',tags=['Autenticação'])
@@ -219,6 +221,7 @@ def create_app(settings: Settings | None = None):
         query = sql.SQL('UPDATE clientes SET {} WHERE id=%s RETURNING '+CLIENT_SELECT).format(sql.SQL(',').join(assignments))
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
+    register_offline(app,authenticated,staff)
     register_daily(app,staff)
     register_driver_day(app,authenticated)
     register_operations(app,staff,admin,PASSWORDS)

@@ -44,10 +44,10 @@ Aceite: uma visita planejada tem identidade estável até o histórico; reenvios
 
 ## 3. Completar operação offline
 
-- [ ] Persistir planejamento e rascunhos com migrações do banco local e proteção adequada dos dados.
-- [ ] Definir sessão segura, renovação, revogação e acesso offline após reabrir o app, com prazo/política explícitos.
-- [ ] Implementar sincronização automática com rede disponível e tentativas progressivas em segundo plano.
-- [ ] Separar pendente, enviando, enviado e conflito; permitir retentar e resolver conflito sem apagar o registro original.
+- [x] Planejamento, rascunhos e fila em SQLite privado, migração v1→v2, backup desativado e falhas de gravação sinalizadas. Sessão persistida usa AES-GCM/Android Keystore e requer bloqueio do aparelho. Validado com testes leves; homologação física continua pendente.
+- [x] Política de sessão de motorista de até 12 horas; renovação por novo login, logout local imediato e revogação no servidor quando online. Reabrir exige credencial do Android; reinício do aparelho, expiração ou alteração relevante do relógio exigem login online. Revogação remota é conhecida na próxima requisição autenticada.
+- [x] JobScheduler com rede obrigatória, tentativa imediata, repetição exponencial e verificação periódica. Sessão lembrada em aparelho com bloqueio é necessária; envio manual permanece disponível. Horário real depende do Android e deve ser homologado em aparelho.
+- [x] Pendente/enviando/enviado/conflito/em conferência/conferido; recuperação de envio interrompido, retentativa explícita e conferência no painel com autor/motivo e vínculo opcional à coleta, preservando o payload original.
 - [x] Impedir que um registro recusado bloqueie todos os demais envios. Validado para conflitos; autenticação/rede continuam interrompendo o envio e preservando a fila.
 - [ ] Testar modo avião, resposta perdida, rede oscilante, reinício, atualização do app, relógio incorreto, virada do dia e logout com pendências.
 
@@ -152,3 +152,5 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 26/09/2026: usuário informou conta Supabase e pediu lista restante a cada entrega. Supabase adotado como destino preferido do banco, sujeito à validação técnica; aguardando identificação do projeto. Nenhum recurso em nuvem foi criado ou migrado.
 
 - 26/09/2026: concluído o passo solicitado de operação diária (etapa 2 deste plano): exceções por data auditadas, transferência de pendentes, revisitas encadeadas, não atendimento offline, progresso e histórico próprio diário/semanal. Migração 006 aplicada no banco privado local. Validação: 43 testes backend, 12 testes Robolectric (incluindo tela de revisita/não atendimento), build web, APK debug e lint aprovados. Mantidos pendentes homologação real, resolução assistida de conflitos e demais etapas. Próxima implementação: completar operação offline (etapa 3); homologação física da etapa 1 continua necessária.
+
+- 26/09/2026: entrega de operação offline: sessão lembrada de até 12 horas, AES-GCM/Keystore e desbloqueio Android; JobScheduler com rede/backoff e recuperação de envios interrompidos; conflitos com retentativa explícita, conferência auditada no painel e resposta ao motorista. Migração 007 aplicada apenas no banco local. Validação: 46 testes backend e 20 testes Android Robolectric aprovados, incluindo concorrência manual/background, criptografia com chave de teste, política de expiração/relógio/reinício, configuração do agendador e tela na virada do dia. Build web, APK e lint aprovados. Corrigida compatibilidade Closeable do SQLiteOpenHelper em Android antigo. Etapa 3 ainda requer homologação física de rede/Doze/force-stop/Keystore/desbloqueio e fluxo ponta a ponta. Próxima implementação independente: rubrica e comprovante (etapa 4).
