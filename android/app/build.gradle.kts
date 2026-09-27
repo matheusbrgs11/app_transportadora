@@ -17,6 +17,16 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    buildTypes {
+        create("staging") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".homologacao"
+            versionNameSuffix = "-homologacao"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }

@@ -1,0 +1,21 @@
+# Configure COLETA_DOMAIN in the Caddy service environment.
+{$COLETA_DOMAIN} {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+    }
+    handle_path /api/* {
+        request_body {
+            max_size 12MB
+        }
+        header Cache-Control "no-store"
+        reverse_proxy 127.0.0.1:8001
+    }
+    handle {
+        root * /srv/coleta/frontend/dist
+        try_files {path} /index.html
+        header Cache-Control "no-cache"
+        file_server
+    }
+}

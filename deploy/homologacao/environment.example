@@ -1,0 +1,5 @@
+# Install outside repository as /etc/coleta/homologacao.env, permissions 0600.
+# Runtime role: NOSUPERUSER NOBYPASSRLS, member of coleta_app.
+# For remote PostgreSQL use verified TLS and the provider's CA configuration.
+DATABASE_URL=postgresql://REPLACE_RUNTIME_USER:REPLACE_PASSWORD@REPLACE_HOST:5432/REPLACE_DATABASE?sslmode=verify-full
+JWT_SECRET=REPLACE_WITH_UNIQUE_RANDOM_SECRET

@@ -130,7 +130,7 @@ A API recusa superusuário/BYPASSRLS, assume `coleta_app` e define a empresa na 
 
 Piloto: quatro motoristas, três carros e uma moto, com Android próprio, sem limite fixo no sistema. Cada empresa tem modalidades próprias. O rastreamento deverá estar vinculado ao turno, com indicação visível e encerramento ao terminar o trabalho.
 
-Faltam homologação Android em aparelho, exportações gerais do histórico, geocodificação, rastreamento e chamados. Rubrica, comprovante e operação offline estão implementados e aguardam homologação física. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
+Faltam homologação Android em aparelho, exportações gerais do histórico, geocodificação, mapa simultâneo da frota e chamados. O rastreamento por turno está implementado e aguarda homologação física. Rubrica, comprovante e operação offline estão implementados e aguardam homologação física. As tabelas desses módulos não equivalem aos fluxos implementados. Nenhuma posição de motorista ou rota no mapa é simulada no painel.
 
 Antes de publicar: HTTPS, recuperação de senha, backups, monitoramento, retenção/limpeza de prévias e sessões, limite de upload no proxy e limite de login compartilhado entre instâncias. O limitador atual é em memória, por IP, para uma instância de desenvolvimento.
 
@@ -209,3 +209,8 @@ Foi preparado **Maps Embed API** opcional para mostrar cliente/trecho selecionad
 Geocodificação não está habilitada: uma chave de Embed não a implementa nem autoriza chamadas a outros serviços. Nenhuma chave deve ser enviada pelo chat ou versionada no Git.
 
 Fontes: [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started), [configuração do Embed](https://developers.google.com/maps/documentation/embed/get-api-key), [modos de mapa](https://developers.google.com/maps/documentation/embed/embedding-map).
+
+
+## Homologação Android e HTTPS
+
+O pacote de preparação está em [deploy/homologacao](deploy/homologacao/README.md). Execute scripts/package-homologacao.sh para gerar .local/homologacao/coleta-homologacao.apk e build.json. Instalação separada do app atual, assinatura somente de teste e acesso HTTPS obrigatório. Ainda não existe URL pública: hospedagem/domínio e banco de homologação precisam ser definidos e validados. Não utilizar dados reais antes dos controles da etapa 9.
