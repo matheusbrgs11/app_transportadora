@@ -31,7 +31,11 @@ class TrackingService: Service(),LocationListener {
     private var lastAttempt=0L
     private var interval=60_000L
     @Volatile private var stopped=false
-    companion object { @Volatile var runningOwner:String?=null; private set }
+    companion object {
+        @Volatile var runningOwner:String?=null; private set
+        @Volatile var lastSentAt:Instant?=null; private set
+        @Volatile var transmissionStatus="Aguardando leitura de localização."; private set
+    }
     private val guard=object:Runnable {
         override fun run() {
             val s=SessionVault(this@TrackingService).valid()
@@ -72,6 +76,7 @@ class TrackingService: Service(),LocationListener {
             if(manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) { manager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,interval,0f,this);providers++ }
             if(providers==0) { stopTracking();return START_NOT_STICKY }
             runningOwner=owner
+            lastSentAt=null;transmissionStatus="Aguardando leitura de localização."
             handler.post(guard)
         } catch(_:SecurityException) { stopTracking() }
         return START_NOT_STICKY
@@ -90,9 +95,11 @@ class TrackingService: Service(),LocationListener {
                 api.request("/motorista/turnos/${turn.getString("id")}/posicao",JSONObject()
                     .put("latitude",location.latitude).put("longitude",location.longitude)
                     .put("precisao_metros",location.accuracy.toDouble()).put("capturada_em",Instant.ofEpochMilli(location.time).toString()))
+                lastSentAt=Instant.now();transmissionStatus="Último envio confirmado pelo servidor."
             } catch(e:ApiError) {
+                transmissionStatus="Posição recusada pelo servidor (${e.status})."
                 if(e.status in listOf(401,403,404,409))handler.post { stopTracking() }
-            } catch(_:Exception) { /* No GPS backlog: the next fresh fix replaces a failed send. */ }
+            } catch(_:Exception) { transmissionStatus="Envio indisponível. Será tentado novamente com uma nova posição." }
             finally { sending.set(false) }
         }
     }

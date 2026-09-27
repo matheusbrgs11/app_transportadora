@@ -105,3 +105,12 @@ Cada atendimento oferece **Abrir destino no Google Maps**. Coordenadas confirmad
 Endereços antigos no cache continuam navegáveis pelo endereço, e a rota não precisa ser baixada de novo apenas para construir o link. A navegação/consulta em si depende das condições do Google Maps. Atualizações cadastrais não reescrevem uma execução diária já emitida. Homologar o destino no aparelho e conferir todos os pontos do piloto antes de usar em campo.
 
 Validação desta entrega: 25 testes Android aprovados (incluindo URL por coordenada zero, endereço com acentos/caracteres especiais, ausência de dados pessoais na URL e fallback lógico para plano antigo), APK e lint. A abertura real do Maps/navegador e a navegação continuam pendentes de aparelho.
+
+
+## Pacotes para teste no aparelho — 27/09/2026
+
+Procedimento atual em [docs/teste-aparelho.md](../docs/teste-aparelho.md). Use Coleta Teste USB para servidor local com encaminhamento ADB, ou Coleta Homologação para API HTTPS publicada. Dados ficam separados entre variantes; instalação de uma variante não migra filas da outra.
+
+Mensagens de indisponibilidade/tempo de resposta/URL incorreta preservam registros locais; redirecionamentos não recebem credenciais. Tela de turno informa resultado da transmissão e horário da última confirmação, mediante atualização da situação. Envio manual processa encerramentos de turno pendentes antes das coletas.
+
+Validação automatizada: 29 testes Android aprovados. Testes novos exercitam HTTP local, bloqueio de redirecionamento, resposta inválida e mensagens de erro. Não equivalem a teste no aparelho.

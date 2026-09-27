@@ -109,6 +109,7 @@ class MainActivity : Activity() {
         page("Coleta • Motorista")
         text("Entre com o acesso fornecido pela transportadora.")
         val server = field("Servidor da transportadora")
+        server.setText(getString(R.string.default_server))
         val company = field("Código da empresa")
         val username = field("Usuário")
         val password = field("Senha", true)
@@ -160,6 +161,10 @@ class MainActivity : Activity() {
         text("Ao iniciar, sua última posição será enviada à transportadora aproximadamente a cada minuto, mesmo com a tela fechada. Encerre ao terminar. O turno expira em até 12 horas.")
         val state=store.tracking(owner)?.optString("state")
         text(if(state=="ending") "Encerramento aguardando conexão; captura parada." else if(TrackingService.runningOwner==owner) "Captura ativa. Confira também a notificação do Android." else "Captura parada neste aparelho.")
+        if(TrackingService.runningOwner==owner) {
+            text(TrackingService.transmissionStatus)
+            TrackingService.lastSentAt?.let { text("Última confirmação: "+it.atZone(ZoneId.systemDefault()).toLocalTime().withNano(0)) }
+        }
         button("Intervalo de envio: $trackingInterval segundos") {
             AlertDialog.Builder(this).setItems(arrayOf("30 segundos","60 segundos","120 segundos","300 segundos")) { _,which ->
                 trackingInterval=listOf(30,60,120,300)[which];trackingScreen()
@@ -456,6 +461,7 @@ class MainActivity : Activity() {
     private fun sync() {
         val service=api ?: return
         background({
+            store.flushTrackingEnd(owner,service)
             VisitSync(store, owner) { body ->
                 val current=session
                 check(current==null || SessionPolicy.valid(current,System.currentTimeMillis(),SystemClock.elapsedRealtime(),vault.boot())) { "Sessão local expirada. Entre novamente." }

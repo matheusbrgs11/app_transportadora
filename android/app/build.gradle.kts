@@ -18,6 +18,14 @@ android {
         versionName = "0.1.0"
     }
     buildTypes {
+        create("usb") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".homologacao.usb"
+            versionNameSuffix = "-usb"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
+        }
         create("staging") {
             initWith(getByName("release"))
             applicationIdSuffix = ".homologacao"

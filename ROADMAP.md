@@ -167,3 +167,9 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 
 
 - 27/09/2026: preparo de homologação sem Docker em deploy/homologacao: serviço API local à máquina, proxy HTTPS/painel estático e roteiro de instalação/teste. Usuário informou não ter hospedagem/domínio; nenhuma infraestrutura foi contratada/publicada. Variante Android staging separada (Coleta Homologação), HTTPS obrigatório, sem depuração, assinada com chave debug apenas para testes. APK/lint aprovados; manifesto e assinatura verificados. Scripts de empacotamento/hash e verificação HTTPS adicionados. Caddy/systemd no servidor e acesso HTTPS externo ainda não validados. Próximos passos externos: escolher hospedagem/domínio, identificar projeto Supabase de homologação e disponibilizar Android físico. Chamados imprevistos seguem como próxima implementação funcional independente.
+
+
+- 27/09/2026: usuário disponibilizou Android e preferiu concluir preparo do APK antes de conectar. Variante USB isolada criada, HTTP limitado ao loopback e servidor preenchido; instalador não apaga dados/concede permissões. Preparada empresa fictícia local com motorista, cliente e rota diária, acessos privados fora do Git. Melhoradas mensagens de rede/API e situação de envio GPS; sincronização manual também envia encerramentos pendentes. Homologação física ainda não iniciada. Procedimento em docs/teste-aparelho.md.
+
+
+- 27/09/2026: revisão pré-instalação: 29 testes Android aprovados, incluindo recusa de redirecionamento sem encaminhar credencial e resposta HTTP inválida. Conta motorista e preparação da rota fictícia verificadas contra API local; reexecução preserva os cadastros. Usuário pediu desenvolvimento antes de conectar, portanto nenhuma instalação, concessão de permissão ou captura GPS física foi executada.
