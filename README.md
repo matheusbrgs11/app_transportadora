@@ -184,3 +184,28 @@ A migração 008 guarda PNG e metadados privadamente no próprio PostgreSQL, usa
 A API valida PNG RGB/RGBA de 8 bits, não entrelaçado, até 128 KB e 1024×512, com CRC e descompressão limitada. Imagens não entram nos eventos de auditoria. O endpoint `GET /coletas/{id}/comprovante` exige autenticação administrativa, isola empresas e retorna `Cache-Control: no-store`. O hash SHA-256 cobre metadados, snapshot serializado e PNG; não representa validação da identidade de quem desenhou. Revisão do texto/uso do comprovante continua prevista na etapa 9.
 
 A política do novo Android exige rubrica com nome ou exceção justificada. A API mantém filas antigas e cadastros administrativos sem comprovante por compatibilidade, exibindo essa ausência explicitamente. Não adiciona rubricas retroativas. Os envios antigos preservam o mesmo hash de idempotência.
+
+## Localização e navegação — 27/09/2026
+
+Em **Clientes → Localização**, informe coordenadas fornecidas pelo cliente ou obtidas por GPS em campo, confira o destino no link do Google Maps e registre fonte/motivo. A gravação exige a versão atual: se o endereço ou ponto mudou, reabra o formulário. Alterações de endereço apagam a confirmação de localização. Alterações apenas de contato não a invalidam. Remoção/correção e invalidação geram eventos privados por empresa.
+
+Em **Rotas → Destinos no mapa**, consulte a sequência e abra cada trecho no Google Maps. A primeira parada parte da origem escolhida no Maps; demais trechos vão da parada anterior à selecionada. Nenhuma parada é descartada para caber em limites de waypoints. Essa tela mostra o planejamento recorrente atual, não a execução histórica. Sem geocodificação automática, endereços podem retornar resultados ambíguos e precisam ser conferidos.
+
+O Android inclui **Abrir destino no Google Maps** em cada atendimento. Pontos confirmados usam latitude/longitude; nos demais casos há aviso e pesquisa por endereço. Google Maps recebe apenas destino/endereço e parâmetros de navegação, sem nome, CNPJ, telefone ou credenciais. Sem o aplicativo Maps, tenta abrir no navegador. Rotas já emitidas e caches antigos mantêm seus dados; corrigir um ponto cadastral vale para próximas execuções. Confira os pontos do piloto antes de emitir o dia.
+
+As URLs oficiais funcionam sem chave. A navegação é solicitada em modo de condução; não há roteirização especializada para caminhão/moto, otimização da ordem, envio de localização do motorista ou rastreamento nesta entrega. A disponibilidade da navegação offline depende do Google Maps e dos mapas baixados no aparelho.
+
+### Google Cloud: pendências e configuração futura
+
+O usuário informou que ainda não tem projeto Google Cloud. Não criamos projeto, ativamos faturamento nem efetuamos geocodificação. Não coletamos ou armazenamos resultados da API Google; somente pontos próprios informados pela operação. As políticas de armazenamento da geocodificação precisam ser revisadas antes de sua integração.
+
+Foi preparado **Maps Embed API** opcional para mostrar cliente/trecho selecionado no painel. Sem chave, permanecem links externos; nada é carregado em iframe. Para habilitar posteriormente:
+
+1. Criar/configurar projeto Google Cloud e verificar os requisitos de faturamento, orçamento e APIs na documentação oficial.
+2. Habilitar Maps Embed API; usar chave exclusiva de navegador, restrita a essa API e aos referenciadores HTTP do ambiente (desenvolvimento: `http://127.0.0.1:5173/*`; produção: apenas domínio HTTPS próprio).
+3. Copiar `frontend/.env.example` para `frontend/.env.local`, definir `VITE_GOOGLE_MAPS_EMBED_KEY` e reiniciar o Vite ou reconstruir o painel. A chave de navegador aparece no cliente por definição; nunca utilizar chave de servidor com acesso a outras APIs.
+4. Validar mapa real, restrições, quotas/medição aplicáveis e alertas antes do piloto. O mapa incorporado desta entrega é por cliente/trecho; uma visão simultânea de todos os pontos ainda não foi implementada.
+
+Geocodificação não está habilitada: uma chave de Embed não a implementa nem autoriza chamadas a outros serviços. Nenhuma chave deve ser enviada pelo chat ou versionada no Git.
+
+Fontes: [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started), [configuração do Embed](https://developers.google.com/maps/documentation/embed/get-api-key), [modos de mapa](https://developers.google.com/maps/documentation/embed/embedding-map).

@@ -153,7 +153,7 @@ def register_driver_day(app, authenticated):
         # A consulta não cria coletas e não expõe dados comerciais dos clientes.
         for route in routes:
             route['paradas'] = conn.execute('''SELECT p.id,p.cliente_id,p.ordem,p.janela_inicio,p.janela_fim,
-                c.nome,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.cep,c.telefone
+                c.nome,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.cep,c.telefone,c.localizacao_confirmada,ST_Y(c.localizacao::geometry) AS latitude,ST_X(c.localizacao::geometry) AS longitude
                 FROM rota_paradas p JOIN clientes c ON c.id=p.cliente_id AND c.empresa_id=p.empresa_id
                 WHERE p.rota_id=%s AND c.ativo ORDER BY p.ordem,p.id''', (route['id'],)).fetchall()
         return {'data': day, 'fuso_horario': zone, 'motorista': driver, 'rotas': routes,

@@ -1,6 +1,6 @@
 # Plano de conclusão do Coleta — versão comercial inicial
 
-Atualizado em 26/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
+Atualizado em 27/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
 
 ## Como seguir este plano
 
@@ -66,11 +66,12 @@ Aceite: comprovante correto recuperável, sem imagem pública nem perda após co
 
 ## 5. Localizar clientes e abrir navegação
 
-- [ ] Configurar provedor de mapas, chaves restritas, quotas, medição e alertas de custo.
-- [ ] Geocodificar endereços; tratar endereço ambíguo/inexistente e permitir confirmação/correção manual.
+- [ ] Configurar projeto Google Cloud, chaves restritas, quotas, medição e alertas de custo. Usuário informou em 27/09/2026 que ainda não possui projeto. Nenhuma conta, API paga ou cobrança foi criada/ativada.
+- [x] Cadastro/correção/remoção manual de pontos fornecidos pelo cliente ou GPS em campo, com versão, motivo e auditoria. Alterar endereço invalida o ponto; execuções já emitidas preservam seu snapshot.
+- [ ] Geocodificar automaticamente e tratar candidatos ambíguos/inexistentes. Depende da configuração e política de armazenamento do provedor.
 - [ ] Respeitar condições de armazenamento e uso do provedor escolhido.
-- [ ] Exibir clientes e sequência de paradas no mapa administrativo.
-- [ ] Abrir navegação no Google Maps a partir do atendimento no Android.
+- [ ] Homologar mapa incorporado no painel. Lista ordenada e links de cada trecho já funcionam; Maps Embed opcional está preparado, mas sem chave/projeto e sem validação real. Ainda não há visão simultânea de todos os pontos.
+- [x] Abrir Google Maps no Android com ponto confirmado ou endereço mediante aviso; fallback para navegador, sem exigir chave e sem transmitir nome/CNPJ/telefone. Homologação em aparelho ainda pendente.
 
 Aceite: endereços do piloto conferidos e navegação para o destino esperado; sem prometer otimização automática de rotas nesta versão.
 
@@ -156,3 +157,5 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 26/09/2026: entrega de operação offline: sessão lembrada de até 12 horas, AES-GCM/Keystore e desbloqueio Android; JobScheduler com rede/backoff e recuperação de envios interrompidos; conflitos com retentativa explícita, conferência auditada no painel e resposta ao motorista. Migração 007 aplicada apenas no banco local. Validação: 46 testes backend e 20 testes Android Robolectric aprovados, incluindo concorrência manual/background, criptografia com chave de teste, política de expiração/relógio/reinício, configuração do agendador e tela na virada do dia. Build web, APK e lint aprovados. Corrigida compatibilidade Closeable do SQLiteOpenHelper em Android antigo. Etapa 3 ainda requer homologação física de rede/Doze/force-stop/Keystore/desbloqueio e fluxo ponta a ponta. Próxima implementação independente: rubrica e comprovante (etapa 4).
 
 - 26/09/2026: rubrica e comprovantes implementados (migração 008). Novo formulário exige assinatura ou exceção justificada; rascunho e imagem preservados offline. PostgreSQL guarda PNG privado atomicamente com a coleta; painel consulta e exporta HTML imprimível com snapshot original. Compatibilidade de reenvio de filas antigas preservada. Validação: 50 testes backend, 23 testes Android (incluindo rasterização nativa simulada), build web, APK e lint aprovados; PNG produzido pelo Android aceito pelo validador real da API. Sem homologação física nem publicação em nuvem. Próxima implementação: localizar clientes e navegação (etapa 5).
+
+- 27/09/2026: localização manual e navegação entregues (migração 009). Pontos versionados/auditados, invalidação por alteração do endereço, snapshots preservados, links por trecho no painel e navegação Android. Google Maps Embed preparado como opção de ambiente, sem carregar mapa ou chamar APIs quando não configurado. Usuário ainda sem projeto Google Cloud; geocodificação e mapa incorporado permanecem pendentes. Validação desta entrega: 52 testes backend, 25 testes Android, build web, APK e lint (evidências nos relatórios locais). Conferência de endereços reais, Google Cloud e homologação física seguem abertas.

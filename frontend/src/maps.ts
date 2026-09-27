@@ -1,0 +1,6 @@
+export type Destination={endereco:string;numero?:string|null;bairro?:string|null;cidade:string;estado:string;cep?:string|null;latitude?:number|null;longitude?:number|null;localizacao_confirmada?:boolean};
+export function confirmed(s:Destination){return s.localizacao_confirmada===true&&typeof s.latitude==='number'&&typeof s.longitude==='number'&&Number.isFinite(s.latitude)&&Number.isFinite(s.longitude)&&Math.abs(s.latitude)<=90&&Math.abs(s.longitude)<=180;}
+export function destination(s:Destination){return confirmed(s)?`${s.latitude},${s.longitude}`:[s.endereco,s.numero,s.bairro,s.cidade,s.estado,s.cep,'Brasil'].filter(Boolean).join(', ');}
+export function mapsLink(s:Destination,from?:Destination){return 'https://www.google.com/maps/dir/?'+new URLSearchParams({api:'1',destination:destination(s),...(from?{origin:destination(from)}:{}),travelmode:'driving'});}
+export function searchLink(s:Destination){return 'https://www.google.com/maps/search/?'+new URLSearchParams({api:'1',query:destination(s)});}
+export function embedLink(s:Destination,from?:Destination){const key=import.meta.env.VITE_GOOGLE_MAPS_EMBED_KEY;if(!key)return null;return 'https://www.google.com/maps/embed/v1/'+(from?'directions':'place')+'?'+new URLSearchParams({key,...(from?{origin:destination(from),destination:destination(s),mode:'driving'}:{q:destination(s)})});}

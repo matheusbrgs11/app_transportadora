@@ -39,7 +39,7 @@ def prepare(conn,user,rid,day,expected_driver=None):
         AND (concluida_em AT TIME ZONE %s)::date=%s LIMIT 1''',(str(rid),zone,day)).fetchone():
         raise HTTPException(409,'Já há visitas antigas nesta rota/data. A operação precisa conferir antes de gerar atendimentos.')
     stops=conn.execute('''SELECT p.cliente_id,p.ordem,p.janela_inicio,p.janela_fim,
-        c.nome,c.cnpj,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.cep,c.telefone
+        c.nome,c.cnpj,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.cep,c.telefone,c.localizacao_confirmada,ST_Y(c.localizacao::geometry) AS latitude,ST_X(c.localizacao::geometry) AS longitude
         FROM rota_paradas p JOIN clientes c ON c.id=p.cliente_id AND c.empresa_id=p.empresa_id
         WHERE p.rota_id=%s AND c.ativo ORDER BY p.ordem FOR SHARE OF c''',(rid,)).fetchall()
     if not stops:

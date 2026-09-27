@@ -97,3 +97,11 @@ A área gera PNG 640×240, até 128 KB, e limita pontos para não crescer indefi
 O backend armazena PNG e snapshot em tabela privada com RLS, na mesma transação da coleta. Falhas desfazem ambas; resposta perdida admite reenvio idêntico. Não há upload separado nem URL pública. O Android antigo ainda pode enviar coletas sem comprovante; esses registros são identificados como sem comprovante, sem gerar assinatura artificial. A captura de rubrica real deve ser homologada com os motoristas antes do piloto.
 
 Validação: 23 testes Android passaram, incluindo gestos/rasterização nativa simulada, limpar, restauração do rascunho, imagem preservada após resposta perdida e ausência/recusa. PNG produzido pelo teste Android foi aceito pelo validador da API. Implementação de desenho baseada na [documentação de Views do Android](https://developer.android.com/develop/ui/views/layout/custom-views/custom-drawing).
+
+## Navegação — migração 009
+
+Cada atendimento oferece **Abrir destino no Google Maps**. Coordenadas confirmadas são preservadas na execução diária; sem ponto, usa endereço com aviso prévio. O link oficial HTTPS funciona sem chave de API, abre primeiro o aplicativo Maps e recorre ao navegador se ele não estiver instalado. Se nenhum estiver disponível, mostra uma orientação. Não envia dados comerciais do cliente nem credenciais; não coleta GPS no Coleta. Modo solicitado: condução, sem garantia de restrições específicas de moto/caminhão.
+
+Endereços antigos no cache continuam navegáveis pelo endereço, e a rota não precisa ser baixada de novo apenas para construir o link. A navegação/consulta em si depende das condições do Google Maps. Atualizações cadastrais não reescrevem uma execução diária já emitida. Homologar o destino no aparelho e conferir todos os pontos do piloto antes de usar em campo.
+
+Validação desta entrega: 25 testes Android aprovados (incluindo URL por coordenada zero, endereço com acentos/caracteres especiais, ausência de dados pessoais na URL e fallback lógico para plano antigo), APK e lint. A abertura real do Maps/navegador e a navegação continuam pendentes de aparelho.

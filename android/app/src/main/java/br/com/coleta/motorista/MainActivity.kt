@@ -193,6 +193,7 @@ class MainActivity : Activity() {
                     else b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
                         Instant.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
                 }
+                button("Abrir destino no Google Maps") { navigate(stop) }
                 val remoteStatus=stop.optString("status","agendada")
                 if (remoteStatus!="agendada") text(when(remoteStatus) {
                     "concluida" -> "Coleta concluída"
@@ -209,6 +210,19 @@ class MainActivity : Activity() {
         records.filter { it.getString("state")!="sent" }.forEach {
             if (it.getString("error").isNotBlank()) text("Registro ${it.getString("id")}: ${it.getString("error")}")
         }
+    }
+    private fun navigate(stop: JSONObject) {
+        fun open() {
+            val intent=Intent(Intent.ACTION_VIEW,Navigation.uri(stop))
+            try { startActivity(Intent(intent).setPackage("com.google.android.apps.maps")) }
+            catch(_:android.content.ActivityNotFoundException) {
+                try { startActivity(intent) }
+                catch(_:android.content.ActivityNotFoundException) { message("Instale Google Maps ou um navegador para abrir o destino.") }
+            }
+        }
+        if(Navigation.confirmed(stop)) open()
+        else AlertDialog.Builder(this).setMessage("Este cliente ainda não tem ponto confirmado. O Google Maps pesquisará pelo endereço; confira o destino antes de seguir.")
+            .setNegativeButton("Voltar",null).setPositiveButton("Pesquisar destino") { _,_ -> open() }.show()
     }
     private fun visit(plan: JSONObject, route: JSONObject, stop: JSONObject) {
         val draftKey = draftKey(plan,route,stop)

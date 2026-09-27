@@ -24,11 +24,12 @@ from .driver_day import register_driver_day
 from .daily import register_daily
 from .offline import register_offline
 from .proofs import register_proofs
+from .locations import register_locations
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
 CLIENT_FIELDS = list(Client.model_fields)
-CLIENT_SELECT = ','.join(['id','empresa_id',*CLIENT_FIELDS,'localizacao_confirmada','criado_em'])
+CLIENT_SELECT = ','.join(['id','empresa_id',*CLIENT_FIELDS,'localizacao_confirmada','localizacao_versao','localizacao_fonte','ST_Y(localizacao::geometry) AS latitude','ST_X(localizacao::geometry) AS longitude','criado_em'])
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -208,7 +209,7 @@ def create_app(settings: Settings | None = None):
 
     @app.put('/clientes/{client_id}',tags=['Clientes'])
     def update_client(client_id: UUID,body: Client,auth=Depends(staff)):
-        conn,_,_ = auth
+        conn,user,_ = auth
         old = conn.execute('SELECT '+CLIENT_SELECT+' FROM clientes WHERE id=%s FOR UPDATE',(client_id,)).fetchone()
         if not old:
             raise HTTPException(404,'Cliente não encontrado.')
@@ -218,10 +219,13 @@ def create_app(settings: Settings | None = None):
         data = body.model_dump(mode='json')
         assignments = [sql.SQL('{}=%s').format(sql.Identifier(k)) for k in data]
         if any(old[k]!=data[k] for k in ('endereco','numero','complemento','bairro','cidade','estado','cep')):
-            assignments.extend([sql.SQL('localizacao=NULL'),sql.SQL('localizacao_confirmada=false')])
+            assignments.extend([sql.SQL('localizacao=NULL'),sql.SQL('localizacao_confirmada=false'),sql.SQL('localizacao_fonte=NULL'),sql.SQL('localizacao_versao=localizacao_versao+1')])
+            conn.execute('INSERT INTO localizacao_eventos(empresa_id,cliente_id,usuario_id,motivo,anterior,nova) VALUES(%s,%s,%s,%s,%s,%s)',
+                (user['empresa_id'],client_id,user['id'],'Endereço alterado: confirmação invalidada',Jsonb({k:old[k] for k in ('latitude','longitude','localizacao_versao')}),Jsonb({'latitude':None,'longitude':None})))
         query = sql.SQL('UPDATE clientes SET {} WHERE id=%s RETURNING '+CLIENT_SELECT).format(sql.SQL(',').join(assignments))
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
+    register_locations(app,staff)
     register_proofs(app,staff)
     register_offline(app,authenticated,staff)
     register_daily(app,staff)

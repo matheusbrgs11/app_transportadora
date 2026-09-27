@@ -149,7 +149,7 @@ def register_operations(app,staff,admin,passwords):
         if not route:
             raise HTTPException(404,'Rota não encontrada.')
         route['paradas']=conn.execute('''SELECT p.id,p.cliente_id,p.ordem,p.janela_inicio,p.janela_fim,
-            c.nome,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.ativo AS cliente_ativo
+            c.nome,c.endereco,c.numero,c.complemento,c.bairro,c.cidade,c.estado,c.ativo AS cliente_ativo,c.localizacao_confirmada,ST_Y(c.localizacao::geometry) AS latitude,ST_X(c.localizacao::geometry) AS longitude
             FROM rota_paradas p JOIN clientes c ON c.id=p.cliente_id AND c.empresa_id=p.empresa_id
             WHERE p.rota_id=%s ORDER BY p.ordem''',(route_id,)).fetchall()
         return route

@@ -18,9 +18,9 @@ export function createApi(token:string,onExpired:()=>void):Api {
  };
 }
 export type User={id:string;nome:string;perfil:'admin'|'operador'|'motorista';empresa_id:string};
-export type Client={id:string;nome:string;cnpj:string;endereco:string;numero:string|null;complemento:string|null;bairro:string|null;cidade:string;estado:string;cep:string|null;telefone:string|null;email:string|null;contrato_status:'nao_informado'|'sem_contrato'|'com_contrato';numero_contrato:string|null;ativo:boolean};
+export type Client={id:string;latitude:number|null;longitude:number|null;localizacao_confirmada:boolean;localizacao_versao:number;localizacao_fonte:string|null;nome:string;cnpj:string;endereco:string;numero:string|null;complemento:string|null;bairro:string|null;cidade:string;estado:string;cep:string|null;telefone:string|null;email:string|null;contrato_status:'nao_informado'|'sem_contrato'|'com_contrato';numero_contrato:string|null;ativo:boolean};
 export type Driver={id:string;nome:string;login:string;tipo:string;placa:string;ativo:boolean;rotas_ativas:number};
-export type Stop={cliente_id:string;nome:string;endereco:string;numero:string|null;cidade:string;estado:string;janela_inicio:string|null;janela_fim:string|null;cliente_ativo?:boolean};
+export type Stop={latitude?:number|null;longitude?:number|null;localizacao_confirmada?:boolean;cliente_id:string;nome:string;endereco:string;numero:string|null;cidade:string;estado:string;janela_inicio:string|null;janela_fim:string|null;cliente_ativo?:boolean};
 export type Route={id:string;nome:string;motorista_id:string;motorista_nome:string;dias_semana:number[];ativa:boolean;versao:number;total_paradas:number;paradas:Stop[];tipo:string;placa:string};
 export type Summary={empresa:string;clientes_ativos:number;motoristas_ativos:number;rotas_ativas:number;enderecos_a_localizar:number};
 export function cnpj(value:string){return value.replace(/^(.{2})(.{3})(.{3})(.{4})(.{2})$/,'$1.$2.$3/$4-$5');}
