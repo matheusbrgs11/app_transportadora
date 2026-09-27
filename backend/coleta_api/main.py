@@ -81,7 +81,7 @@ def create_app(settings: Settings | None = None):
             yield conn,user,session_id
 
     def staff(auth=Depends(authenticated)):
-        if auth[1]['perfil'] not in ('admin','operador'):
+        if auth[1]['perfil'] not in ('admin','operador','agendamento'):
             raise HTTPException(403,'Acesso restrito à equipe administrativa.')
         return auth
 
@@ -156,7 +156,7 @@ def create_app(settings: Settings | None = None):
         return {'items':records,'total':total,'limit':limit,'offset':offset}
 
     @app.post('/clientes',status_code=201,tags=['Clientes'])
-    def create_client(body: Client,auth=Depends(staff)):
+    def create_client(body: Client,auth=Depends(admin)):
         return insert_client(auth[0],auth[1]['empresa_id'],body)
 
     @app.post('/clientes/importacoes/previa',status_code=201,tags=['Importação'])
@@ -209,7 +209,7 @@ def create_app(settings: Settings | None = None):
         return client
 
     @app.put('/clientes/{client_id}',tags=['Clientes'])
-    def update_client(client_id: UUID,body: Client,auth=Depends(staff)):
+    def update_client(client_id: UUID,body: Client,auth=Depends(admin)):
         conn,user,_ = auth
         old = conn.execute('SELECT '+CLIENT_SELECT+' FROM clientes WHERE id=%s FOR UPDATE',(client_id,)).fetchone()
         if not old:
@@ -227,7 +227,7 @@ def create_app(settings: Settings | None = None):
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
     register_tracking(app,authenticated,staff)
-    register_locations(app,staff)
+    register_locations(app,staff,admin)
     register_proofs(app,staff)
     register_offline(app,authenticated,staff)
     register_daily(app,staff)

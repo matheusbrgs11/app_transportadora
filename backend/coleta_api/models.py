@@ -85,7 +85,7 @@ class UserCreate(StrictModel):
     nome: str = Field(min_length=1, max_length=250)
     login: str = Field(min_length=1, max_length=150)
     senha: str = Field(min_length=12, max_length=256)
-    perfil: Literal['admin','operador','motorista']
+    perfil: Literal['admin','operador','motorista','agendamento']
 
     @field_validator('nome','login')
     @classmethod

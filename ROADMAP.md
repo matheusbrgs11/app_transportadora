@@ -173,3 +173,8 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 
 
 - 27/09/2026: revisão pré-instalação: 29 testes Android aprovados, incluindo recusa de redirecionamento sem encaminhar credencial e resposta HTTP inválida. Conta motorista e preparação da rota fictícia verificadas contra API local; reexecução preserva os cadastros. Usuário pediu desenvolvimento antes de conectar, portanto nenhuma instalação, concessão de permissão ou captura GPS física foi executada.
+
+
+- 27/09/2026: perfil agendamento adicionado (migração 011), com Rastreamento/Motoristas/Rotas fixas/Coletas, abertura inicial em Coletas e criação de acesso pelo administrador. Cadastro, atualização, importação, localização e desativação de clientes restritos a admin na API; operador legado também segue essa regra. Consulta de clientes preservada para seleção em rotas/coletas. Gestão ampla de usuários, recuperação e bloqueio de acessos continuam pendentes na etapa 8. Não inclui integração WhatsApp nem despacho de chamados imprevistos.
+
+Validação do perfil agendamento: 55 testes backend aprovados, build web aprovado, migração 011 aplicada no banco local e smoke autenticado local aprovado. Nenhum APK precisou ser alterado nesta entrega.

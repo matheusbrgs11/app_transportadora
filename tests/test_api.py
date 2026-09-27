@@ -83,7 +83,7 @@ def test_driver_and_operator_permissions(context,customer):
     assert client.get('/clientes',headers=driver).status_code==403
     assert client.post('/clientes',json=customer,headers=driver).status_code==403
     operator=login(usuario='operador')
-    assert client.post('/clientes',json=customer,headers=operator).status_code==201
+    assert client.post('/clientes',json=customer,headers=operator).status_code==403
     assert client.post('/usuarios',json={'nome':'X','login':'x','senha':'senha-segura-teste','perfil':'admin'},headers=operator).status_code==403
     assert client.post('/clientes/importacoes/previa',files={'arquivo':('teste.xlsx',workbook([HEADERS,ROW]))},headers=operator).status_code==403
 

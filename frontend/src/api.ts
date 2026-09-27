@@ -17,7 +17,7 @@ export function createApi(token:string,onExpired:()=>void):Api {
   return response.status===204?undefined as T:response.json();
  };
 }
-export type User={id:string;nome:string;perfil:'admin'|'operador'|'motorista';empresa_id:string};
+export type User={id:string;nome:string;perfil:'admin'|'operador'|'motorista'|'agendamento';empresa_id:string};
 export type Client={id:string;latitude:number|null;longitude:number|null;localizacao_confirmada:boolean;localizacao_versao:number;localizacao_fonte:string|null;nome:string;cnpj:string;endereco:string;numero:string|null;complemento:string|null;bairro:string|null;cidade:string;estado:string;cep:string|null;telefone:string|null;email:string|null;contrato_status:'nao_informado'|'sem_contrato'|'com_contrato';numero_contrato:string|null;ativo:boolean};
 export type Driver={id:string;nome:string;login:string;tipo:string;placa:string;ativo:boolean;rotas_ativas:number};
 export type Stop={latitude?:number|null;longitude?:number|null;localizacao_confirmada?:boolean;cliente_id:string;nome:string;endereco:string;numero:string|null;cidade:string;estado:string;janela_inicio:string|null;janela_fim:string|null;cliente_ativo?:boolean};

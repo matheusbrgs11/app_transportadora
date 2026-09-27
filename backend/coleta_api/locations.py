@@ -24,7 +24,7 @@ class Location(StrictModel):
         return self
 
 
-def register_locations(app,staff):
+def register_locations(app,staff,admin):
     @app.get('/clientes/{cliente_id}/localizacao',tags=['Localização'])
     def get(cliente_id:UUID,auth=Depends(staff)):
         row=auth[0].execute('SELECT '+POINT_FIELDS+' FROM clientes WHERE id=%s',(cliente_id,)).fetchone()
@@ -32,7 +32,7 @@ def register_locations(app,staff):
         return row
 
     @app.put('/clientes/{cliente_id}/localizacao',tags=['Localização'])
-    def update(cliente_id:UUID,body:Location,auth=Depends(staff)):
+    def update(cliente_id:UUID,body:Location,auth=Depends(admin)):
         conn,user,_=auth
         old=conn.execute('SELECT '+POINT_FIELDS+' FROM clientes WHERE id=%s FOR UPDATE',(cliente_id,)).fetchone()
         if not old: raise HTTPException(404,'Cliente não encontrado.')
