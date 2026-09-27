@@ -178,3 +178,5 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 27/09/2026: perfil agendamento adicionado (migração 011), com Rastreamento/Motoristas/Rotas fixas/Coletas, abertura inicial em Coletas e criação de acesso pelo administrador. Cadastro, atualização, importação, localização e desativação de clientes restritos a admin na API; operador legado também segue essa regra. Consulta de clientes preservada para seleção em rotas/coletas. Gestão ampla de usuários, recuperação e bloqueio de acessos continuam pendentes na etapa 8. Não inclui integração WhatsApp nem despacho de chamados imprevistos.
 
 Validação do perfil agendamento: 55 testes backend aprovados, build web aprovado, migração 011 aplicada no banco local e smoke autenticado local aprovado. Nenhum APK precisou ser alterado nesta entrega.
+
+- Correção durante teste físico: erro 401 no login agora informa empresa/usuário/senha incorretos, em vez de sessão expirada; preserva formulário para corrigir os dados. Erros 401 de sessão autenticada mantêm o fluxo de novo login.

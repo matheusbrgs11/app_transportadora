@@ -94,7 +94,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 busy = false
                 if (!isDestroyed) {
-                    if (failure is ApiError && failure.status==401) {
+                    if (failure is ApiError && failure.status==401 && api!=null) {
                         haltTracking();api?.let { vault.clear(owner,it.token) };SyncScheduler.cancel(this@MainActivity);session=null;login()
                         message(failure.message ?: "Entre novamente.");return@runOnUiThread
                     }

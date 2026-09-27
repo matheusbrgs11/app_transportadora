@@ -6,7 +6,8 @@ import org.json.JSONObject
 
 class ApiError(val status: Int, message: String) : Exception(message)
 object ApiMessages {
-    fun refusal(code:Int,raw:String):String {
+    fun refusal(code:Int,raw:String,login:Boolean=false):String {
+        if(code==401 && login) return "Empresa, usuário ou senha incorretos. Confira os três campos e tente novamente."
         if(code==401) return "Sessão expirada. Entre novamente; os registros continuam salvos."
         if(code>=500) return "Servidor indisponível ($code). Tente novamente; registros salvos permanecem no aparelho."
         if(code in 300..399) return "O endereço redireciona para outro servidor. Confira a URL fornecida pela transportadora."
@@ -36,7 +37,7 @@ class Api(val base: String, var token: String = "") {
             }
             val code = connection.responseCode
             val raw = (if (code in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) throw ApiError(code, ApiMessages.refusal(code,raw))
+            if (code !in 200..299) throw ApiError(code, ApiMessages.refusal(code,raw,path=="/auth/login"))
             return if (raw.isBlank()) JSONObject() else JSONObject(raw)
         } catch(e:javax.net.ssl.SSLException) {
             throw java.io.IOException("Não foi possível validar a conexão HTTPS. Confira o endereço e a data/hora do aparelho.",e)

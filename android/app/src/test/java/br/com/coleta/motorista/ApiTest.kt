@@ -46,5 +46,7 @@ class ApiTest {
         assertFalse(ApiMessages.refusal(502,"<html>private upstream details</html>").contains("private upstream"))
         assertTrue(ApiMessages.refusal(422,"""{"detail":[{"msg":"Informe o motivo"}]}""").contains("Informe o motivo"))
         assertTrue(ApiMessages.refusal(401,"anything").contains("registros continuam salvos"))
+        assertTrue(ApiMessages.refusal(401,"anything",true).contains("Empresa, usuário ou senha incorretos"))
+        assertFalse(ApiMessages.refusal(401,"anything",true).contains("Sessão expirada"))
     }
 }
