@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private var owner = ""
     private var day: JSONObject? = null
     private var busy = false
+    private var trackingInterval = 60
     private var session: JSONObject? = null
     private lateinit var vault: SessionVault
     override fun onCreate(state: Bundle?) {
@@ -43,7 +44,7 @@ class MainActivity : Activity() {
             val intent=getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent("Coleta","Confirme para abrir sua rota")
             if(intent!=null) startActivityForResult(intent,41) else { vault.clear();login() }
         }
-        button("Entrar com outra conta") { vault.clear();SyncScheduler.cancel(this);login() }
+        button("Entrar com outra conta") { haltTracking();vault.clear();SyncScheduler.cancel(this);login() }
     }
     @Deprecated("Legacy activity result supports Android 8")
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
@@ -58,7 +59,7 @@ class MainActivity : Activity() {
     private fun sessionAllowed(): Boolean {
         val current=session ?: return true
         if(SessionPolicy.valid(current,System.currentTimeMillis(),SystemClock.elapsedRealtime(),vault.boot()) && (!current.optBoolean("remember") || vault.valid()?.optString("token")==current.getString("token"))) return true
-        session=null;login();message("Acesso local expirado ou relógio alterado. Entre novamente; seus registros estão preservados.")
+        haltTracking();session=null;login();message("Acesso local expirado ou relógio alterado. Entre novamente; seus registros estão preservados.")
         return false
     }
     private fun scheduleSync() {
@@ -94,7 +95,7 @@ class MainActivity : Activity() {
                 busy = false
                 if (!isDestroyed) {
                     if (failure is ApiError && failure.status==401) {
-                        api?.let { vault.clear(owner,it.token) };SyncScheduler.cancel(this@MainActivity);session=null;login()
+                        haltTracking();api?.let { vault.clear(owner,it.token) };SyncScheduler.cancel(this@MainActivity);session=null;login()
                         message(failure.message ?: "Entre novamente.");return@runOnUiThread
                     }
                     if (failure != null) message(failure.message ?: "Não foi possível conectar. Os registros salvos foram preservados.")
@@ -149,6 +150,68 @@ class MainActivity : Activity() {
             store.cache(owner,updated); day = updated
         }, { home() })
     }
+    private fun haltTracking() {
+        val key=owner.ifEmpty { vault.valid()?.optString("owner") ?: "" }
+        if(key.isNotEmpty()) store.endTracking(key)
+        stopService(Intent(this,TrackingService::class.java))
+    }
+    private fun trackingScreen() {
+        page("Localização durante o turno")
+        text("Ao iniciar, sua última posição será enviada à transportadora aproximadamente a cada minuto, mesmo com a tela fechada. Encerre ao terminar. O turno expira em até 12 horas.")
+        val state=store.tracking(owner)?.optString("state")
+        text(if(state=="ending") "Encerramento aguardando conexão; captura parada." else if(TrackingService.runningOwner==owner) "Captura ativa. Confira também a notificação do Android." else "Captura parada neste aparelho.")
+        button("Intervalo de envio: $trackingInterval segundos") {
+            AlertDialog.Builder(this).setItems(arrayOf("30 segundos","60 segundos","120 segundos","300 segundos")) { _,which ->
+                trackingInterval=listOf(30,60,120,300)[which];trackingScreen()
+            }.show()
+        }
+        text("Alterações de intervalo valem no próximo início da captura.")
+        button("Iniciar / retomar turno") {
+            if(vault.valid()?.optString("owner")!=owner) { message("Entre com a opção de manter acesso habilitada e bloqueio de tela configurado.");return@button }
+            val permissions=mutableListOf(android.Manifest.permission.ACCESS_COARSE_LOCATION,android.Manifest.permission.ACCESS_FINE_LOCATION)
+            if(android.os.Build.VERSION.SDK_INT>=33) permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+            if(checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                (android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)) {
+                requestPermissions(permissions.toTypedArray(),53);message("Após autorizar, toque novamente em Iniciar / retomar turno.");return@button
+            }
+            val service=api ?: return@button
+            var ready=false
+            background({
+                store.flushTrackingEnd(owner,service)
+                var local=store.tracking(owner)
+                if(local==null) {
+                    check(service.request("/motorista/turnos/atual").isNull("turno")) { "Existe turno em outro aparelho. Use Encerrar turno antes de iniciar aqui." }
+                    local=JSONObject().put("id",UUID.randomUUID().toString()).put("state","starting")
+                    store.tracking(owner,local)
+                }
+                val turn=service.request("/motorista/turnos",JSONObject().put("id",local.getString("id")))
+                if(!turn.isNull("encerrado_em")) {
+                    store.endTracking(owner);store.flushTrackingEnd(owner,service)
+                    error("Turno anterior encerrado. Toque em Iniciar para abrir outro.")
+                }
+                store.tracking(owner,turn.put("state","active").put("interval_seconds",trackingInterval))
+                ready=true
+            },{
+                if(ready && hasWindowFocus()) {
+                    runCatching { startForegroundService(Intent(this,TrackingService::class.java)) }.onFailure {
+                        haltTracking();scheduleSync();message("Não foi possível iniciar a localização. Confira as permissões e tente novamente.")
+                    }
+                }
+                trackingScreen()
+            })
+        }
+        button("Encerrar turno") {
+            val service=api ?: return@button
+            haltTracking()
+            background({
+                store.flushTrackingEnd(owner,service)
+                val current=service.request("/motorista/turnos/atual").optJSONObject("turno")
+                if(current!=null) service.request("/motorista/turnos/${current.getString("id")}/encerrar",JSONObject())
+            },{scheduleSync();trackingScreen()})
+        }
+        button("Atualizar situação") { trackingScreen() }
+        button("Voltar para minha rota") { home() }
+    }
     private fun home() {
         page("Minha rota")
         val records = store.visits(owner)
@@ -157,6 +220,7 @@ class MainActivity : Activity() {
         button("Registros salvos e conferências") { outbox() }
         button("Meu histórico • hoje") { history(days = 1) }
         button("Meu histórico • últimos 7 dias") { history() }
+        button("Turno e localização") { trackingScreen() }
         button("Atualizar rota") { refresh() }
         button("Enviar registros salvos") { sync() }
         button("Sair / entrar novamente") {
@@ -164,8 +228,8 @@ class MainActivity : Activity() {
             val pending=records.count { it.getString("state") !in listOf("sent","resolved") }
             AlertDialog.Builder(this).setMessage("Sair? $pending registros permanecem no aparelho. O envio automático será pausado até novo login nesta conta.")
                 .setNegativeButton("Continuar trabalhando",null).setPositiveButton("Sair") { _,_ ->
-                    vault.clear();SyncScheduler.cancel(this);session=null
-                    background({ runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
+                    haltTracking();vault.clear();SyncScheduler.cancel(this);session=null
+                    background({ runCatching { if(service!=null) store.flushTrackingEnd(owner,service) };runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
                 }.show()
         }
         val plan = day

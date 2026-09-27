@@ -77,11 +77,13 @@ Aceite: endereços do piloto conferidos e navegação para o destino esperado; s
 
 ## 6. Rastreamento durante o turno
 
-- [ ] Implementar início/fim de turno, permissões, explicação ao motorista e indicação visível de rastreamento.
-- [ ] Capturar e transmitir posição em segundo plano, com frequência configurável e tratamento de bateria/rede.
-- [ ] Validar precisão/horário e impedir que posição atrasada substitua uma mais recente.
-- [ ] Mostrar motorista, última atualização e precisão no mapa; distinguir posição atual de posição antiga/indisponível.
-- [ ] Interromper rastreamento ao encerrar turno e aplicar política de retenção.
+- [x] Implementar início/fim de turno, permissões, explicação ao motorista e serviço Android com notificação de rastreamento.
+- [x] Implementar captura em serviço foreground e envio com intervalos de 30/60/120/300 segundos; falhas descartam posições antigas. Consumo de bateria e comportamento real do Android ainda dependem de homologação.
+- [x] Validar precisão/horário e impedir que posição atrasada substitua uma mais recente.
+- [x] Painel com última posição, horário, precisão, estado de conexão e link para Google Maps.
+- [ ] Mapa incorporado com múltiplos motoristas e homologação com Google Cloud.
+- [x] Interromper captura ao encerrar/sair; guardar encerramento offline para retentativa. API rejeita posições de turnos encerrados/expirados e mantém somente a última posição.
+- [ ] Aprovar retenção e automatizar limpeza periódica em produção: atualmente a posição é apagada ao encerrar no servidor ou no próximo acesso ao rastreamento após expiração de 12 horas; não existe limpeza agendada.
 - [ ] Testar aparelhos reais, economia de bateria, permissão revogada, falta de sinal e app em segundo plano.
 
 Aceite: operação identifica localização e sua atualidade; não há rastreamento fora do turno no fluxo definido; consumo validado no piloto.
@@ -159,3 +161,6 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 - 26/09/2026: rubrica e comprovantes implementados (migração 008). Novo formulário exige assinatura ou exceção justificada; rascunho e imagem preservados offline. PostgreSQL guarda PNG privado atomicamente com a coleta; painel consulta e exporta HTML imprimível com snapshot original. Compatibilidade de reenvio de filas antigas preservada. Validação: 50 testes backend, 23 testes Android (incluindo rasterização nativa simulada), build web, APK e lint aprovados; PNG produzido pelo Android aceito pelo validador real da API. Sem homologação física nem publicação em nuvem. Próxima implementação: localizar clientes e navegação (etapa 5).
 
 - 27/09/2026: localização manual e navegação entregues (migração 009). Pontos versionados/auditados, invalidação por alteração do endereço, snapshots preservados, links por trecho no painel e navegação Android. Google Maps Embed preparado como opção de ambiente, sem carregar mapa ou chamar APIs quando não configurado. Usuário ainda sem projeto Google Cloud; geocodificação e mapa incorporado permanecem pendentes. Validação desta entrega: 52 testes backend, 25 testes Android, build web, APK e lint (evidências nos relatórios locais). Conferência de endereços reais, Google Cloud e homologação física seguem abertas.
+
+
+- 27/09/2026: rastreamento por turno implementado (migração 010), isolamento por empresa/motorista, início idempotente, encerramento e descarte da última posição, expiração em 12 horas e rejeição de posições atrasadas. Android usa serviço foreground iniciado pelo motorista, permissões de localização/notificação, sessão protegida e intervalos configuráveis. Painel consulta a cada 15 segundos e sinaliza dados antigos/indisponibilidade. Sem histórico de percurso nem simulação apresentada como posição real. Validação: 54 testes backend e 27 testes Android aprovados, build web, APK debug e lint aprovados. Migração 010 aplicada no banco local e endpoint autenticado conferido via HTTP. Pendentes aparelhos reais, mapa incorporado, limpeza agendada e política de retenção aprovada.

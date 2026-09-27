@@ -6,8 +6,9 @@ import Clients from './Clients';
 import Drivers from './Drivers';
 import Routes from './Routes';
 import Collections from './Collections';
+import Tracking from './Tracking';
 
-const pages=[{id:'clientes',name:'Clientes',icon:Users,caption:'Sua base de clientes, em um só lugar.'},{id:'motoristas',name:'Motoristas',icon:Truck,caption:'Quem faz a operação acontecer.'},{id:'rotas',name:'Rotas fixas',icon:RouteIcon,caption:'Organize os caminhos de cada motorista.'},{id:'coletas',name:'Coletas',icon:ClipboardList,caption:'Registre as visitas e consulte o histórico por cliente.'}] as const;
+const pages=[{id:'rastreamento',name:'Rastreamento',icon:Truck,caption:'Última posição dos motoristas durante o turno.'},{id:'clientes',name:'Clientes',icon:Users,caption:'Sua base de clientes, em um só lugar.'},{id:'motoristas',name:'Motoristas',icon:Truck,caption:'Quem faz a operação acontecer.'},{id:'rotas',name:'Rotas fixas',icon:RouteIcon,caption:'Organize os caminhos de cada motorista.'},{id:'coletas',name:'Coletas',icon:ClipboardList,caption:'Registre as visitas e consulte o histórico por cliente.'}] as const;
 type Page=typeof pages[number]['id'];
 export default function App(){
  const [session,setSession]=useState<{token:string;user:User}|null>(null);
@@ -37,6 +38,7 @@ export default function App(){
    <main><div className="page-heading"><div><span className="eyebrow">GESTÃO OPERACIONAL</span><h1>{current.name}</h1><p>{current.caption}</p></div><span className="date">{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'long',year:'numeric'}).format(new Date())}</span></div>
     <div className="stats">{[{label:'Clientes ativos',value:summary?.clientes_ativos,icon:Users},{label:'Motoristas ativos',value:summary?.motoristas_ativos,icon:Truck},{label:'Rotas ativas',value:summary?.rotas_ativas,icon:RouteIcon}].map(({label,value,icon:Icon})=><div className="stat" key={label}><span className="stat-icon"><Icon size={21}/></span><div><span>{label}</span><strong>{value??'—'}</strong></div></div>)}</div>
     <ErrorBox message={error}/>
+    {page==='rastreamento'&&<Tracking api={api}/>}
     {page==='clientes'&&<Clients api={api} admin={session.user.perfil==='admin'} changed={changed} onHistory={client=>{setHistoryClient(client);setPage('coletas');}}/>}
     {page==='motoristas'&&<Drivers api={api} admin={session.user.perfil==='admin'} changed={changed}/>}
     {page==='rotas'&&<Routes api={api} changed={changed}/>}

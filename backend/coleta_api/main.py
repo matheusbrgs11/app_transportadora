@@ -25,6 +25,7 @@ from .daily import register_daily
 from .offline import register_offline
 from .proofs import register_proofs
 from .locations import register_locations
+from .tracking import register_tracking
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -225,6 +226,7 @@ def create_app(settings: Settings | None = None):
         query = sql.SQL('UPDATE clientes SET {} WHERE id=%s RETURNING '+CLIENT_SELECT).format(sql.SQL(',').join(assignments))
         return conn.execute(query,[*data.values(),client_id]).fetchone()
 
+    register_tracking(app,authenticated,staff)
     register_locations(app,staff)
     register_proofs(app,staff)
     register_offline(app,authenticated,staff)

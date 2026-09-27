@@ -6,17 +6,43 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.database.sqlite.SQLiteDatabase
 import org.json.JSONObject
 
-class Store(context: Context) : SQLiteOpenHelper(context, "coleta.db", null, 2), java.io.Closeable {
+class Store(context: Context) : SQLiteOpenHelper(context, "coleta.db", null, 3), java.io.Closeable {
     private fun drafts(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE drafts(owner TEXT NOT NULL, stop TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(owner,stop))")
     }
     override fun onCreate(db: SQLiteDatabase) {
         drafts(db)
+        trackingTable(db)
         db.execSQL("CREATE TABLE cache(owner TEXT PRIMARY KEY, payload TEXT NOT NULL)")
         db.execSQL("CREATE TABLE visits(id TEXT PRIMARY KEY, owner TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL, error TEXT NOT NULL)")
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) drafts(db)
+        if (oldVersion < 3) trackingTable(db)
+    }
+    private fun trackingTable(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE tracking(owner TEXT PRIMARY KEY,payload TEXT NOT NULL)")
+    }
+    fun tracking(owner: String): JSONObject? = readableDatabase.rawQuery("SELECT payload FROM tracking WHERE owner=?",arrayOf(owner)).use {
+        if(it.moveToFirst()) JSONObject(it.getString(0)) else null
+    }
+    fun tracking(owner: String, payload: JSONObject) {
+        check(writableDatabase.insertWithOnConflict("tracking",null,ContentValues().apply {
+            put("owner",owner);put("payload",payload.toString())
+        },SQLiteDatabase.CONFLICT_REPLACE)>=0)
+    }
+    fun endTracking(owner: String) {
+        val db=writableDatabase;db.beginTransaction()
+        try { tracking(owner)?.let { tracking(owner,it.put("state","ending")) };db.setTransactionSuccessful() }
+        finally { db.endTransaction() }
+    }
+    fun flushTrackingEnd(owner: String, api: Api) {
+        val record=tracking(owner) ?: return
+        if(record.optString("state")!="ending") return
+        try { api.request("/motorista/turnos/${record.getString("id")}/encerrar",JSONObject()) }
+        catch(e:ApiError) { if(e.status!=404) throw e }
+        // A new start is forbidden while this marker exists.
+        writableDatabase.delete("tracking","owner=? AND payload=?",arrayOf(owner,record.toString()))
     }
     fun draft(owner: String, stop: String): JSONObject? = readableDatabase.rawQuery(
         "SELECT payload FROM drafts WHERE owner=? AND stop=?", arrayOf(owner,stop)

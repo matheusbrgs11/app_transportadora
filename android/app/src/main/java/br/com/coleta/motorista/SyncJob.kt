@@ -41,6 +41,10 @@ class SyncJob: JobService() {
                     val owner=session.getString("owner")
                     val api=Api(session.getString("base"),session.getString("token"))
                     Store(this).use { store ->
+                        try { store.flushTrackingEnd(owner,api) } catch(e:ApiError) {
+                            if(e.status==401) vault.clear(owner,api.token)
+                            throw e
+                        }
                         VisitSync(store,owner) { body ->
                             check(!stopped.get() && vault.valid()?.optString("token")==api.token) { "Envio interrompido. Entre novamente se necessário." }
                             try { api.request("/motorista/coletas",body) }
