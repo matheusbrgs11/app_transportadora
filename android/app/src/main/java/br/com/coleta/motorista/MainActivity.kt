@@ -260,7 +260,7 @@ class MainActivity : Activity() {
                     val b=it.getJSONObject("body")
                     if (!b.isNull("coleta_id") && !stop.isNull("coleta_id")) b.getString("coleta_id")==stop.getString("coleta_id")
                     else b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
-                        Instant.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
+                        ApiTime.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
                 }
                 button("Abrir destino no Google Maps") { navigate(stop) }
                 val remoteStatus=stop.optString("status","agendada")
@@ -418,7 +418,7 @@ class MainActivity : Activity() {
                     "cancelada" -> "Cancelada"
                     else -> "Pendente"
                 }
-                val local=Instant.parse(row.getString("data_referencia")).atZone(ZoneId.of(data.getString("fuso_horario")))
+                val local=ApiTime.parse(row.getString("data_referencia")).atZone(ZoneId.of(data.getString("fuso_horario")))
                 text("${row.getString("cliente_nome")} • $status • tentativa ${row.getInt("tentativa")}\n${local.toLocalDate()}")
             }
             if (offset>0) button("Página anterior") { history(maxOf(0,offset-50),days) }

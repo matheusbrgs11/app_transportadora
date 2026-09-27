@@ -108,7 +108,7 @@ class ProofEditor(context: Context, saved: JSONObject?, private val changed: () 
         val result=JSONObject().put("tipo",type).put("responsavel",who.ifBlank { null } ?: JSONObject.NULL)
         if(type=="assinatura") {
             check(who.isNotEmpty()) { "Informe o nome do responsável pela rubrica." }
-            check(Duration.between(Instant.parse(captured),Instant.now()).seconds in 0..1800) { "A rubrica tem mais de 30 minutos. Peça ao responsável para refazê-la." }
+            check(Duration.between(ApiTime.parse(captured),Instant.now()).seconds in 0..1800) { "A rubrica tem mais de 30 minutos. Peça ao responsável para refazê-la." }
             result.put("imagem_png",pad.png()).put("capturado_em",captured)
         } else {
             check(why.isNotEmpty()) { "Justifique a ausência ou recusa de assinatura." }

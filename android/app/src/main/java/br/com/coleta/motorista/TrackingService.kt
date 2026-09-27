@@ -42,7 +42,7 @@ class TrackingService: Service(),LocationListener {
             val t=store.tracking(owner)
             if(stopped)return
             if(s==null||s.optString("owner")!=owner||t?.optString("state")!="active"||
-                Instant.parse(t.getString("expira_em"))<=Instant.now()||
+                ApiTime.parse(t.getString("expira_em"))<=Instant.now()||
                 checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
                 stopTracking();return
             }

@@ -180,3 +180,5 @@ iOS, otimização automática avançada, emissão fiscal/CT-e/MDF-e, integraçõ
 Validação do perfil agendamento: 55 testes backend aprovados, build web aprovado, migração 011 aplicada no banco local e smoke autenticado local aprovado. Nenhum APK precisou ser alterado nesta entrega.
 
 - Correção durante teste físico: erro 401 no login agora informa empresa/usuário/senha incorretos, em vez de sessão expirada; preserva formulário para corrigir os dados. Erros 401 de sessão autenticada mantêm o fluxo de novo login.
+
+- Homologação física Samsung: identificado crash ao abrir histórico por Instant.parse rejeitar data ISO com offset -03:00 no Android. Leitura centralizada via OffsetDateTime, aplicada também à expiração de turno, datas da fila e rubrica; teste de regressão cobre UTC, offsets, frações e virada de data no fuso local.
