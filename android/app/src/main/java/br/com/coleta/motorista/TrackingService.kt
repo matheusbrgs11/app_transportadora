@@ -19,6 +19,7 @@ object TrackingPolicy {
         location.latitude.isFinite() && location.latitude in -90.0..90.0 &&
         location.longitude.isFinite() && location.longitude in -180.0..180.0 &&
         nowMillis-location.time in 0..120_000 && nowNanos-location.elapsedRealtimeNanos in 0..120_000_000_000
+    fun afterTurnStart(location: Location, startedAt: Instant): Boolean = location.time >= startedAt.toEpochMilli()
 }
 
 class TrackingService: Service(),LocationListener {
@@ -83,6 +84,12 @@ class TrackingService: Service(),LocationListener {
     }
     override fun onLocationChanged(location:Location) {
         if(stopped||!TrackingPolicy.acceptable(location,System.currentTimeMillis(),SystemClock.elapsedRealtimeNanos()))return
+        val turn=store.tracking(owner) ?: return
+        if(turn.optString("state")!="active")return
+        if(!TrackingPolicy.afterTurnStart(location,ApiTime.parse(turn.getString("iniciado_em")))) {
+            transmissionStatus="Aguardando uma nova leitura de localização."
+            return
+        }
         val now=SystemClock.elapsedRealtime()
         if(now-lastAttempt<interval||!sending.compareAndSet(false,true))return
         lastAttempt=now

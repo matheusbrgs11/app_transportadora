@@ -8,6 +8,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[28])
@@ -20,6 +21,8 @@ class TrackingTest {
         assertFalse(TrackingPolicy.acceptable(p,199_000,201_000_000_000))
         p.accuracy=1001f
         assertFalse(TrackingPolicy.acceptable(p,201_000,201_000_000_000))
+        assertFalse(TrackingPolicy.afterTurnStart(p,Instant.ofEpochMilli(201_000)))
+        assertTrue(TrackingPolicy.afterTurnStart(p,Instant.ofEpochMilli(200_000)))
     }
     @Test fun closingPersistsWithoutChangingAnotherAccount() {
         val context=RuntimeEnvironment.getApplication()
