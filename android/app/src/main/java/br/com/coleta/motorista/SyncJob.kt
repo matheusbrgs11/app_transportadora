@@ -6,6 +6,7 @@ import android.app.job.JobScheduler
 import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
+import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -28,6 +29,7 @@ object SyncScheduler {
 }
 
 class SyncJob: JobService() {
+    private companion object { const val TAG="ColetaSync" }
     private val executor=Executors.newSingleThreadExecutor()
     private val running=ConcurrentHashMap<Int,AtomicBoolean>()
     override fun onStartJob(params: JobParameters): Boolean {
@@ -45,7 +47,7 @@ class SyncJob: JobService() {
                             if(e.status==401) vault.clear(owner,api.token)
                             throw e
                         }
-                        VisitSync(store,owner) { body ->
+                        val sent=VisitSync(store,owner) { body ->
                             check(!stopped.get() && vault.valid()?.optString("token")==api.token) { "Envio interrompido. Entre novamente se necessário." }
                             try { api.request("/motorista/coletas",body) }
                             catch(e:ApiError) {
@@ -53,12 +55,19 @@ class SyncJob: JobService() {
                                 throw e
                             }
                         }.run()
+                        Log.i(TAG,"Sincronização em segundo plano concluída: $sent registro(s).")
                     }
+                } else {
+                    Log.w(TAG,"Sincronização em segundo plano ignorada: sessão indisponível ou execução interrompida.")
                 }
             } catch (e:ApiError) {
                 // Revocation/expiry stops automatic retries until a fresh login.
                 retry=e.status!=401
-            } catch (_:Exception) { retry=!stopped.get() }
+                Log.w(TAG,"Sincronização em segundo plano falhou com HTTP ${e.status}; retentar=$retry.")
+            } catch (e:Exception) {
+                retry=!stopped.get()
+                Log.w(TAG,"Sincronização em segundo plano falhou com ${e.javaClass.simpleName}; retentar=$retry.")
+            }
             finally {
                 if (!stopped.get()) jobFinished(params,retry)
                 running.remove(params.jobId,stopped)
