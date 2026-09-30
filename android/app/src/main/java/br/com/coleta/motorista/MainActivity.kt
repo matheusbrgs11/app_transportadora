@@ -10,6 +10,10 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.text.Editable
 import android.view.View
+import android.view.Gravity
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,11 +21,20 @@ import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.util.Locale
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    private enum class Tab { COLETAS, CLIENTES, HISTORICO, MAIS }
+    private val navy=Color.rgb(20,42,68)
+    private val blue=Color.rgb(25,95,180)
+    private val muted=Color.rgb(91,107,125)
+    private val backgroundColor=Color.rgb(245,248,252)
+    private val dateFormat=DateTimeFormatter.ofPattern("EEEE, dd 'de' MMMM 'de' yyyy",Locale("pt","BR"))
     private lateinit var layout: LinearLayout
+    private lateinit var root: LinearLayout
     private lateinit var store: Store
     private val executor = Executors.newSingleThreadExecutor()
     private var api: Api? = null
@@ -66,13 +79,54 @@ class MainActivity : Activity() {
         if(vault.valid()!=null) runCatching { SyncScheduler.schedule(this) }
             .onFailure { message("Envio automático indisponível. Use Enviar registros salvos.") }
     }
-    private fun page(title: String) {
-        layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24,48,24,32) }
-        setContentView(ScrollView(this).apply { addView(layout) })
-        text(title, 26f)
+    private fun rounded(color: Int, radius: Float = 18f, stroke: Int? = null) = GradientDrawable().apply {
+        setColor(color); cornerRadius=radius * resources.displayMetrics.density
+        if(stroke!=null) setStroke((1*resources.displayMetrics.density).toInt(),stroke)
     }
+    private fun page(title: String, tab: Tab? = null) {
+        root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setBackgroundColor(backgroundColor) }
+        layout=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(18),dp(20),dp(28)) }
+        val scroll=ScrollView(this).apply { isFillViewport=true;addView(layout) }
+        root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        if(tab!=null) bottomNavigation(tab)
+        setContentView(root)
+        text(title,27f).apply { setTextColor(navy);setTypeface(null,Typeface.BOLD);setPadding(0,dp(8),0,dp(8)) }
+    }
+    private fun dp(value: Int)=(value*resources.displayMetrics.density).toInt()
     private fun text(value: String, size: Float = 17f) = TextView(this).also {
-        it.text = value; it.textSize = size; it.setPadding(0,12,0,12); layout.addView(it)
+        it.text=value;it.textSize=size;it.setTextColor(navy);it.setPadding(0,dp(7),0,dp(7));layout.addView(it)
+    }
+    private fun hint(value: String)=text(value,14f).apply { setTextColor(muted) }
+    private fun section(value: String)=text(value,20f).apply { setTypeface(null,Typeface.BOLD);setPadding(0,dp(22),0,dp(7)) }
+    private fun card(build: () -> Unit) {
+        val outer=layout
+        val content=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(16))
+            background=rounded(Color.WHITE,18f,Color.rgb(224,232,240))
+        }
+        outer.addView(content,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
+        layout=content
+        try { build() } finally { layout=outer }
+    }
+    private fun bottomNavigation(current: Tab) {
+        val bar=LinearLayout(this).apply {
+            orientation=LinearLayout.HORIZONTAL;setPadding(dp(8),dp(7),dp(8),dp(7));setBackgroundColor(Color.WHITE)
+        }
+        val items=listOf(Triple(Tab.COLETAS,"Coletas","📦"),Triple(Tab.CLIENTES,"Clientes","👤"),
+            Triple(Tab.HISTORICO,"Histórico","🕒"),Triple(Tab.MAIS,"Mais","☰"))
+        for((tab,label,icon) in items) {
+            val item=TextView(this).apply {
+                text="$icon\n$label";textSize=13f;gravity=Gravity.CENTER
+                setTypeface(null,if(tab==current) Typeface.BOLD else Typeface.NORMAL)
+                setTextColor(if(tab==current) blue else muted)
+                contentDescription=label
+                setOnClickListener { if(!busy && sessionAllowed()) when(tab) {
+                    Tab.COLETAS -> home();Tab.CLIENTES -> clients();Tab.HISTORICO -> historyHome();Tab.MAIS -> more()
+                } }
+            }
+            bar.addView(item,LinearLayout.LayoutParams(0,dp(60),1f))
+        }
+        root.addView(bar,LinearLayout.LayoutParams(-1,-2))
     }
     private fun field(label: String, secret: Boolean = false): EditText {
         text(label)
@@ -84,7 +138,13 @@ class MainActivity : Activity() {
         }
     }
     private fun button(label: String, action: () -> Unit) = Button(this).also {
-        it.text = label; it.setOnClickListener { if (!busy && sessionAllowed()) action() }; layout.addView(it)
+        it.text=label;it.textSize=16f;it.isAllCaps=false;it.minHeight=dp(52)
+        it.setTextColor(Color.WHITE);it.background=rounded(blue,14f)
+        it.setOnClickListener { if (!busy && sessionAllowed()) action() }
+        layout.addView(it,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
+    }
+    private fun secondaryButton(label: String, action: () -> Unit)=button(label,action).apply {
+        setTextColor(blue);background=rounded(Color.rgb(233,242,254),14f)
     }
     private fun message(value: String) { AlertDialog.Builder(this).setMessage(value).setPositiveButton("OK",null).show() }
     private fun background(work: () -> Unit, done: () -> Unit) {
@@ -171,15 +231,20 @@ class MainActivity : Activity() {
             }.show()
         }
         text("Alterações de intervalo valem no próximo início da captura.")
-        button("Iniciar / retomar turno") {
-            if(vault.valid()?.optString("owner")!=owner) { message("Entre com a opção de manter acesso habilitada e bloqueio de tela configurado.");return@button }
+        button("Iniciar / retomar turno") { startTurn() }
+        button("Encerrar turno") { endTurn() }
+        secondaryButton("Atualizar situação") { trackingScreen() }
+        secondaryButton("Voltar para minha rota") { home() }
+    }
+    private fun startTurn() {
+            if(vault.valid()?.optString("owner")!=owner) { message("Entre com a opção de manter acesso habilitada e bloqueio de tela configurado.");return }
             val permissions=mutableListOf(android.Manifest.permission.ACCESS_COARSE_LOCATION,android.Manifest.permission.ACCESS_FINE_LOCATION)
             if(android.os.Build.VERSION.SDK_INT>=33) permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
             if(checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED ||
                 (android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)) {
-                requestPermissions(permissions.toTypedArray(),53);message("Após autorizar, toque novamente em Iniciar / retomar turno.");return@button
+                requestPermissions(permissions.toTypedArray(),53);message("Após autorizar, toque novamente em Iniciar turno.");return
             }
-            val service=api ?: return@button
+            val service=api ?: return
             var ready=false
             background({
                 store.flushTrackingEnd(owner,service)
@@ -202,83 +267,150 @@ class MainActivity : Activity() {
                         haltTracking();scheduleSync();message("Não foi possível iniciar a localização. Confira as permissões e tente novamente.")
                     }
                 }
-                trackingScreen()
+                home()
             })
-        }
-        button("Encerrar turno") {
-            val service=api ?: return@button
+    }
+    private fun endTurn() {
+            val service=api ?: return
             haltTracking()
             background({
                 store.flushTrackingEnd(owner,service)
                 val current=service.request("/motorista/turnos/atual").optJSONObject("turno")
                 if(current!=null) service.request("/motorista/turnos/${current.getString("id")}/encerrar",JSONObject())
-            },{scheduleSync();trackingScreen()})
-        }
-        button("Atualizar situação") { trackingScreen() }
-        button("Voltar para minha rota") { home() }
+            },{scheduleSync();home()})
     }
     private fun home() {
-        page("Minha rota")
+        page("Meu dia",Tab.COLETAS)
         val records = store.visits(owner)
-        text("${records.count { it.getString("state") in listOf("pending","sending") }} aguardando envio • ${records.count { it.getString("state") in listOf("conflict","review") }} em conferência")
-        text(if(vault.valid()!=null) "Envio automático habilitado enquanto a sessão estiver válida; o Android define quando executar." else "Envio manual disponível nesta sessão.")
-        button("Registros salvos e conferências") { outbox() }
-        button("Meu histórico • hoje") { history(days = 1) }
-        button("Meu histórico • últimos 7 dias") { history() }
-        button("Turno e localização") { trackingScreen() }
-        button("Atualizar rota") { refresh() }
-        button("Enviar registros salvos") { sync() }
-        button("Sair / entrar novamente") {
-            val service = api
-            val pending=records.count { it.getString("state") !in listOf("sent","resolved") }
-            AlertDialog.Builder(this).setMessage("Sair? $pending registros permanecem no aparelho. O envio automático será pausado até novo login nesta conta.")
-                .setNegativeButton("Continuar trabalhando",null).setPositiveButton("Sair") { _,_ ->
-                    haltTracking();vault.clear();SyncScheduler.cancel(this);session=null
-                    background({ runCatching { if(service!=null) store.flushTrackingEnd(owner,service) };runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
-                }.show()
+        val pending=records.count { it.getString("state") in listOf("pending","sending") }
+        val review=records.count { it.getString("state") in listOf("conflict","review") }
+        val state=store.tracking(owner)?.optString("state")
+        card {
+            text(when {
+                state=="ending" -> "Turno encerrado • aguardando conexão"
+                TrackingService.runningOwner==owner -> "Turno em andamento"
+                else -> "Turno não iniciado"
+            },20f).setTypeface(null,Typeface.BOLD)
+            hint("A transportadora recebe sua localização durante o turno.")
+            button(if(TrackingService.runningOwner==owner) "Finalizar turno" else "Iniciar turno") {
+                if(TrackingService.runningOwner==owner) endTurn() else startTurn()
+            }
+        }
+        if(pending>0 || review>0) card {
+            text("$pending aguardando envio • $review em conferência",17f).setTypeface(null,Typeface.BOLD)
+            secondaryButton("Ver registros") { outbox() }
         }
         val plan = day
-        if (plan == null) { text("Conecte-se e atualize para carregar sua rota."); return }
-        text("${plan.getString("data")} • ${plan.getString("fuso_horario")}")
+        if (plan == null) {
+            card { text("Sua rota ainda não foi carregada.");button("Carregar rota de hoje") { refresh() } }
+            return
+        }
+        val routeDate=LocalDate.parse(plan.getString("data"))
+        hint(routeDate.format(dateFormat).replaceFirstChar { it.titlecase(Locale("pt","BR")) })
         val today = LocalDate.now(ZoneId.of(plan.getString("fuso_horario"))).toString()
         val current = today == plan.getString("data")
-        if (!current) text("Esta rota é de outro dia. Atualize antes de registrar novas visitas.")
+        if (!current) card { text("Esta rota é de outro dia. Atualize antes de registrar novas visitas.") }
+        secondaryButton("Atualizar rota do dia") { refresh() }
         val routes = plan.getJSONArray("rotas")
-        if (routes.length()==0) text("Nenhuma rota programada para este dia.")
+        if (routes.length()==0) card { text("Nenhuma rota programada para este dia.") }
         for (r in 0 until routes.length()) {
-            val route = routes.getJSONObject(r); text(route.getString("nome"),22f)
+            val route = routes.getJSONObject(r)
+            section(route.getString("nome"))
             val progress = route.optJSONObject("progresso")
-            if (progress != null) text("No servidor: ${progress.optInt("agendada")} pendentes · ${progress.optInt("concluida")} concluídas · ${progress.optInt("nao_atendida")} não atendidas · ${progress.optInt("cancelada")} canceladas")
+            if (progress != null) hint("${progress.optInt("agendada")} para atender · ${progress.optInt("concluida")} concluídas")
             val stops = route.getJSONArray("paradas")
             for (s in 0 until stops.length()) {
                 val stop = stops.getJSONObject(s)
-                text("${stop.getInt("ordem")}. ${stop.getString("nome")} • tentativa ${stop.optInt("tentativa",1)}",20f)
-                text(listOf("endereco","numero","complemento","bairro","cidade","estado").filter { !stop.isNull(it) }.joinToString(", ") { stop.getString(it) })
-                if (!stop.isNull("telefone")) text("Telefone: ${stop.getString("telefone")}")
-                if (!stop.isNull("janela_inicio")) text("Atendimento: ${stop.getString("janela_inicio")}–${stop.getString("janela_fim")}")
                 val existing = records.lastOrNull {
                     val b=it.getJSONObject("body")
                     if (!b.isNull("coleta_id") && !stop.isNull("coleta_id")) b.getString("coleta_id")==stop.getString("coleta_id")
                     else b.getString("rota_id")==route.getString("id") && b.getString("cliente_id")==stop.getString("cliente_id") &&
                         ApiTime.parse(b.getString("concluida_em")).atZone(ZoneId.of(plan.getString("fuso_horario"))).toLocalDate().toString()==today
                 }
-                button("Abrir destino no Google Maps") { navigate(stop) }
                 val remoteStatus=stop.optString("status","agendada")
-                if (remoteStatus!="agendada") text(when(remoteStatus) {
-                    "concluida" -> "Coleta concluída"
-                    "cancelada" -> "Coleta cancelada"
-                    else -> "Atendimento não realizado"
-                })
-                else if (existing != null) text(if (existing.getString("state")=="sent") "Atendimento enviado" else "Atendimento salvo no aparelho • aguardando envio")
-                else if (current) {
-                    button("Registrar coleta • ${stop.getString("nome")}") { visit(plan,route,stop) }
-                    button("Não atendida • ${stop.getString("nome")}") { notAttended(plan,route,stop) }
+                card {
+                    text("${stop.getInt("ordem")}. ${stop.getString("nome")}",20f).setTypeface(null,Typeface.BOLD)
+                    val status=when {
+                        remoteStatus=="concluida" -> "Concluída"
+                        remoteStatus=="cancelada" -> "Cancelada"
+                        remoteStatus!="agendada" -> "Não atendida"
+                        existing?.optString("state")=="sent" -> "Enviada"
+                        existing!=null -> "Salva no aparelho • aguardando envio"
+                        else -> "Próxima coleta"
+                    }
+                    hint("$status · tentativa ${stop.optInt("tentativa",1)}")
+                    if(remoteStatus=="agendada" && existing==null && current) {
+                        button("Realizar coleta") { visit(plan,route,stop) }
+                        secondaryButton("Não foi possível atender") { notAttended(plan,route,stop) }
+                    }
+                    secondaryButton("Abrir no Google Maps") { navigate(stop) }
                 }
             }
         }
-        records.filter { it.getString("state")!="sent" }.forEach {
-            if (it.getString("error").isNotBlank()) text("Registro ${it.getString("id")}: ${it.getString("error")}")
+    }
+    private fun clients() {
+        page("Clientes da rota",Tab.CLIENTES)
+        val plan=day
+        if(plan==null) { card { text("Carregue sua rota para ver os clientes de hoje.");button("Carregar rota") { refresh() } };return }
+        hint("Endereços e contatos das paradas de hoje.")
+        val routes=plan.getJSONArray("rotas")
+        var count=0
+        for(r in 0 until routes.length()) {
+            val stops=routes.getJSONObject(r).getJSONArray("paradas")
+            for(s in 0 until stops.length()) {
+                val stop=stops.getJSONObject(s);count++
+                card {
+                    text(stop.getString("nome"),20f).setTypeface(null,Typeface.BOLD)
+                    hint(listOf("endereco","numero","complemento","bairro","cidade","estado")
+                        .filter { !stop.isNull(it) && stop.optString(it).isNotBlank() }
+                        .joinToString(", ") { stop.getString(it) })
+                    if(!stop.isNull("telefone")) text("Telefone: ${stop.getString("telefone")}",16f)
+                    if(!stop.isNull("janela_inicio")) hint("Horário: ${stop.getString("janela_inicio")}–${stop.getString("janela_fim")}")
+                    secondaryButton("Abrir no Google Maps") { navigate(stop) }
+                }
+            }
         }
+        if(count==0) card { text("Nenhum cliente programado para hoje.") }
+    }
+    private fun historyHome() {
+        page("Histórico",Tab.HISTORICO)
+        hint("Confira atendimentos anteriores e registros salvos neste aparelho.")
+        card {
+            text("Atendimentos",20f).setTypeface(null,Typeface.BOLD)
+            button("Ver coletas de hoje") { history(days=1) }
+            secondaryButton("Ver últimos 7 dias") { history() }
+            secondaryButton("Ver últimos 6 meses") { history(days=183) }
+        }
+        val records=store.visits(owner)
+        val pending=records.count { it.getString("state") in listOf("pending","sending") }
+        card {
+            text("Registros do aparelho",20f).setTypeface(null,Typeface.BOLD)
+            hint("$pending aguardando envio")
+            secondaryButton("Ver registros e conferências") { outbox() }
+        }
+    }
+    private fun more() {
+        page("Mais opções",Tab.MAIS)
+        card {
+            text("Turno e localização",20f).setTypeface(null,Typeface.BOLD)
+            hint("Inicie ou finalize o turno e confira o último envio de localização.")
+            button("Abrir turno") { trackingScreen() }
+        }
+        card {
+            text("Conexão",20f).setTypeface(null,Typeface.BOLD)
+            secondaryButton("Atualizar rota") { refresh() }
+            secondaryButton("Enviar registros salvos") { sync() }
+        }
+        secondaryButton("Sair da conta") { logout() }
+    }
+    private fun logout() {
+        val service=api
+        val pending=store.visits(owner).count { it.getString("state") !in listOf("sent","resolved") }
+        AlertDialog.Builder(this).setMessage("Sair? $pending registros permanecem no aparelho. O envio automático será pausado até novo login nesta conta.")
+            .setNegativeButton("Continuar trabalhando",null).setPositiveButton("Sair") { _,_ ->
+                haltTracking();vault.clear();SyncScheduler.cancel(this);session=null
+                background({ runCatching { if(service!=null) store.flushTrackingEnd(owner,service) };runCatching { service?.request("/auth/logout",JSONObject()) } }, { login() })
+            }.show()
     }
     private fun navigate(stop: JSONObject) {
         fun open() {
@@ -296,8 +428,10 @@ class MainActivity : Activity() {
     private fun visit(plan: JSONObject, route: JSONObject, stop: JSONObject) {
         val draftKey = draftKey(plan,route,stop)
         val draft = store.draft(owner,draftKey)
-        page(stop.getString("nome"))
-        text("Selecione as modalidades. Deixe a quantidade em branco se precisar conferir na base.")
+        page("Realizar coleta")
+        section(stop.getString("nome"))
+        hint("1. Selecione o tipo de mercadoria e informe a quantidade.")
+        hint("Se não souber a quantidade, deixe o campo vazio para conferir depois.")
         val mods = plan.getJSONArray("modalidades")
         val entries = mutableListOf<Triple<String,CheckBox,EditText>>()
         for (i in 0 until mods.length()) {
@@ -306,7 +440,8 @@ class MainActivity : Activity() {
             val quantity=EditText(this).apply { hint="Quantidade a conferir"; inputType=InputType.TYPE_CLASS_NUMBER }; layout.addView(quantity)
             entries.add(Triple(m.getString("id"),selected,quantity))
         }
-        val notes=field("Observações")
+        section("2. Detalhes")
+        val notes=field("Observações (opcional)")
         var proofEditor: ProofEditor? = null
         fun persistDraft() {
             val fields=JSONObject()
@@ -331,10 +466,11 @@ class MainActivity : Activity() {
             quantity.addTextChangedListener(watcher)
         }
         notes.addTextChangedListener(watcher)
+        section("3. Assinatura ou justificativa")
         proofEditor=ProofEditor(this,draft?.optJSONObject("comprovante")) { persistDraft() }
         layout.addView(proofEditor)
         text("Rascunho preservado neste aparelho. Só será enviado após salvar a coleta.")
-        button("Salvar coleta no aparelho") {
+        button("Concluir coleta") {
             if(!saveDayAllowed(plan)) return@button
             if (stop.isNull("coleta_id")) {
                 message("Atualize a rota antes de registrar esta coleta. O rascunho foi preservado."); return@button
@@ -354,7 +490,7 @@ class MainActivity : Activity() {
                 .put("concluida_em",Instant.now().toString()).put("itens",items).put("observacoes",notes.text.toString())
             try { store.saveDraftVisit(owner,draftKey,body); scheduleSync();home(); sync() } catch (e: Exception) { message("Não foi possível salvar no aparelho. Mantenha esta tela e tente novamente.") }
         }
-        button("Voltar • manter rascunho") { home() }
+        secondaryButton("Voltar e manter rascunho") { home() }
     }
     private fun saveDayAllowed(plan: JSONObject): Boolean {
         if(LocalDate.now(ZoneId.of(plan.getString("fuso_horario"))).toString()==plan.getString("data")) return true
@@ -406,8 +542,8 @@ class MainActivity : Activity() {
         val start=end.minusDays((days-1).toLong())
         background({ result=service.request("/motorista/historico?limit=50&offset=$offset&data_inicio=$start&data_fim=$end") }, {
             val data=result ?: return@background
-            page(if(days==1) "Meu histórico • hoje" else "Meu histórico • últimos 7 dias")
-            text("${data.getString("data_inicio")} a ${data.getString("data_fim")} • ${data.getInt("total")} atendimentos")
+            page(when(days) { 1 -> "Coletas de hoje"; 7 -> "Últimos 7 dias"; else -> "Últimos 6 meses" },Tab.HISTORICO)
+            hint("${data.getInt("total")} atendimentos")
             val rows=data.getJSONArray("items")
             if (rows.length()==0) text("Nenhum atendimento neste período.")
             for (i in 0 until rows.length()) {
@@ -419,22 +555,41 @@ class MainActivity : Activity() {
                     else -> "Pendente"
                 }
                 val local=ApiTime.parse(row.getString("data_referencia")).atZone(ZoneId.of(data.getString("fuso_horario")))
-                text("${row.getString("cliente_nome")} • $status • tentativa ${row.getInt("tentativa")}\n${local.toLocalDate()}")
+                card {
+                    text(row.getString("cliente_nome"),20f).setTypeface(null,Typeface.BOLD)
+                    text(local.toLocalDate().format(dateFormat).replaceFirstChar { it.titlecase(Locale("pt","BR")) },16f)
+                    hint("$status · tentativa ${row.getInt("tentativa")}")
+                }
             }
             if (offset>0) button("Página anterior") { history(maxOf(0,offset-50),days) }
             if (offset+rows.length()<data.getInt("total")) button("Próxima página") { history(offset+50,days) }
-            button("Voltar para minha rota") { home() }
         })
     }
+    private fun clientName(body: JSONObject): String {
+        val plan=day ?: return "Cliente da coleta"
+        val routes=plan.optJSONArray("rotas") ?: return "Cliente da coleta"
+        for(r in 0 until routes.length()) {
+            val stops=routes.getJSONObject(r).optJSONArray("paradas") ?: continue
+            for(s in 0 until stops.length()) {
+                val stop=stops.getJSONObject(s)
+                if(stop.optString("cliente_id")==body.optString("cliente_id")) return stop.optString("nome","Cliente da coleta")
+            }
+        }
+        return "Cliente da coleta"
+    }
     private fun outbox() {
-        page("Registros salvos e conferências")
+        page("Registros salvos",Tab.HISTORICO)
         val records=store.visits(owner)
         if(records.isEmpty()) text("Nenhum registro salvo nesta conta.")
         for(record in records) {
             val id=record.getString("id");val state=record.getString("state");val body=record.getJSONObject("body")
             val label=when(state) { "pending"->"Pendente";"sending"->"Enviando";"sent"->"Enviado";"review"->"Em conferência";"resolved"->"Conferido pela operação";else->"Conflito" }
-            text("${body.optString("concluida_em")} • $label",20f)
-            text("${body.optString("status","concluida")} · ${body.optString("motivo",body.optString("observacoes"))}")
+            val date=runCatching { ApiTime.parse(body.getString("concluida_em")).atZone(ZoneId.systemDefault()).toLocalDate().format(dateFormat) }.getOrDefault("Data indisponível")
+            section(clientName(body))
+            text(date.replaceFirstChar { it.titlecase(Locale("pt","BR")) },16f)
+            hint(label)
+            val detail=body.optString("motivo",body.optString("observacoes"))
+            if(detail.isNotBlank()) hint(detail)
             if(record.optString("error").isNotBlank()) text(record.getString("error"))
             if(state=="conflict") {
                 button("Retentar este registro") { store.state(owner,id,"pending");scheduleSync();sync() }
@@ -456,7 +611,6 @@ class MainActivity : Activity() {
                 }, { outbox() })
             }
         }
-        button("Voltar para minha rota") { home() }
     }
     private fun sync() {
         val service=api ?: return

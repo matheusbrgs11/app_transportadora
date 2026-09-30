@@ -39,15 +39,15 @@ class DailyUiTest {
         set(a,"owner","a");set(a,"day",plan)
         MainActivity::class.java.getDeclaredMethod("home").apply { isAccessible=true }.invoke(a)
         fun buttons()=views(a.findViewById(android.R.id.content)).filterIsInstance<Button>()
-        assertEquals(1,buttons().count { it.text.toString().startsWith("Registrar coleta") })
-        buttons().single { it.text.toString().startsWith("Não atendida") }.performClick()
+        assertEquals(1,buttons().count { it.text.toString()=="Realizar coleta" })
+        buttons().single { it.text.toString()=="Não foi possível atender" }.performClick()
         views(a.findViewById(android.R.id.content)).filterIsInstance<EditText>().single().setText("Portaria fechada")
         buttons().single { it.text.toString().startsWith("Salvar não atendimento") }.performClick()
         val saved=store.visits("a").single { it.getJSONObject("body").optString("coleta_id")==second }
         assertEquals("pending",saved.getString("state"))
         assertEquals("nao_atendida",saved.getJSONObject("body").getString("status"))
         assertEquals("Portaria fechada",saved.getJSONObject("body").getString("motivo"))
-        assertFalse(buttons().any { it.text.toString().startsWith("Registrar coleta") })
+        assertFalse(buttons().any { it.text.toString()=="Realizar coleta" })
         controller.pause().stop().destroy(); store.close(); context.deleteDatabase("coleta.db")
     }
     @Test fun dayRolloverBlocksSavingButKeepsTheDraft() {
