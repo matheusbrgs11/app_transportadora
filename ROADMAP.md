@@ -194,3 +194,5 @@ Validação do perfil agendamento: 55 testes backend aprovados, build web aprova
 - 30/09/2026: recuperação após encerramento forçado do processo validada no Samsung. O aplicativo foi encerrado e reaberto por ADB sem limpar dados; usuário confirmou a tela de desbloqueio por credencial do aparelho e retorno correto à rota salva. Reinício completo do aparelho ainda em validação, pois a política exige login online depois da reinicialização.
 
 - 30/09/2026: reinício completo do Samsung validado. O aplicativo solicitou novo login, conforme a política; após restabelecer USB e autenticar, usuário confirmou que rota e registros anteriores permaneciam disponíveis.
+
+- 30/09/2026: persistência de coleta pendente após logout/login validada no Samsung. O usuário registrou a coleta sem conexão, saiu e entrou novamente no aplicativo e confirmou o registro como pendente. Após restabelecer o encaminhamento USB, acionou o envio manual e confirmou o status `enviado`. Permanece pendente testar interrupção durante a transmissão e sincronização automática em segundo plano/Doze.
