@@ -44,6 +44,8 @@ class DailyUiTest {
         assertTrue(views(a.findViewById(android.R.id.content)).filterIsInstance<TextView>()
             .any { it.text.toString()=="Turno em andamento" })
         assertTrue(buttons().any { it.text.toString()=="Finalizar turno" })
+        assertTrue(buttons().any { it.text.toString()=="Ver situação da localização" })
+        assertFalse(buttons().any { it.text.toString()=="Retomar localização" })
         assertEquals(1,buttons().count { it.text.toString()=="Realizar coleta" })
         buttons().single { it.text.toString()=="Não foi possível atender" }.performClick()
         views(a.findViewById(android.R.id.content)).filterIsInstance<EditText>().single().setText("Portaria fechada")

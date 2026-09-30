@@ -324,15 +324,13 @@ class MainActivity : Activity() {
             },20f).setTypeface(null,Typeface.BOLD)
             hint(when {
                 state=="ending" -> "A localização foi interrompida. O encerramento será enviado quando houver conexão."
-                state=="active" && TrackingService.runningOwner==owner -> "Localização ativa durante o turno."
-                state=="active" -> "Turno aberto. Confira a localização em Mais opções."
+                state=="active" -> "Confira a localização e o último envio quando precisar."
                 else -> "Inicie o turno para compartilhar sua localização com a transportadora."
             })
             button(if(state=="active") "Finalizar turno" else "Iniciar turno") {
                 if(state=="active") endTurn() else startTurn()
             }
-            if(state=="active" && TrackingService.runningOwner!=owner)
-                secondaryButton("Retomar localização") { startTurn() }
+            if(state=="active") secondaryButton("Ver situação da localização") { trackingScreen() }
         }
         if(pending>0 || review>0) card {
             text("$pending aguardando envio • $review em conferência",17f).setTypeface(null,Typeface.BOLD)
