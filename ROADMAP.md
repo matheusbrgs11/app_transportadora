@@ -196,3 +196,5 @@ Validação do perfil agendamento: 55 testes backend aprovados, build web aprova
 - 30/09/2026: reinício completo do Samsung validado. O aplicativo solicitou novo login, conforme a política; após restabelecer USB e autenticar, usuário confirmou que rota e registros anteriores permaneciam disponíveis.
 
 - 30/09/2026: persistência de coleta pendente após logout/login validada no Samsung. O usuário registrou a coleta sem conexão, saiu e entrou novamente no aplicativo e confirmou o registro como pendente. Após restabelecer o encaminhamento USB, acionou o envio manual e confirmou o status `enviado`. Permanece pendente testar interrupção durante a transmissão e sincronização automática em segundo plano/Doze.
+
+- 30/09/2026: interrupção de envio validada no Samsung. Uma revisita fictícia foi concluída sem conexão e mantida em fila; após iniciar o envio, o cabo foi removido imediatamente e o registro continuou pendente. Ao restabelecer USB e reenviar uma única vez, o aplicativo exibiu `enviado`. A API confirmou uma revisita concluída e uma única ocorrência para a coleta de origem, sem duplicidade.
