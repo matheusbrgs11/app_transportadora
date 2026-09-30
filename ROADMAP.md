@@ -101,13 +101,13 @@ Aceite: chamado sai do painel, é recebido pelo motorista e termina no históric
 
 ## 8. Finalizar gestão e relatórios
 
-- [ ] Gestão de usuários/perfis, recuperação e troca de senha, bloqueio de acesso e encerramento de sessões.
+- [x] Gestão de usuários/perfis, recuperação e troca de senha, bloqueio de acesso e encerramento de sessões.
   - [x] Painel do administrador lista/cria acessos administrativos, bloqueia/reativa, redefine senhas e revoga sessões; troca da própria senha exige a senha atual e também revoga sessões. Motoristas seguem na aba própria.
-  - [ ] Recuperação de senha sem acesso ao administrador e política de entrega segura da senha temporária; revisar necessidade antes do piloto.
-- [ ] Gestão de empresas, fuso e modalidades próprias; onboarding sem editar diretamente o banco.
-- [ ] Exportar histórico filtrado em CSV e PDF, com conferência de totais e proteção contra fórmulas em CSV.
-- [ ] Resumo operacional de pendências, concluídas, não atendidas, volumes a conferir e chamados.
-- [ ] Padronizar erros, estados vazios, confirmações e acessibilidade das telas.
+  - [x] Recuperação independente do administrador por oito códigos de uso único gerados com senha atual, exibidos apenas uma vez. Sem código guardado, o administrador redefine a senha; após recuperação/troca, códigos antigos são invalidados.
+- [x] Gestão da própria empresa, fuso e modalidades pelo painel; onboarding de outra empresa por CLI privada sem SQL manual.
+- [x] Exportar histórico filtrado em CSV e PDF, com linha/resumo de totais, limite explícito e proteção contra fórmulas em CSV.
+- [x] Resumo operacional de agendadas, concluídas, não atendidas, itens a conferir e chamados registrados.
+- [x] Padronizar erros, estados vazios, confirmações e acessibilidade básica das telas administrativas: tratamento compartilhado da API, diálogo de bloqueio, foco de modal, atalhos/labels, alvos de toque, contraste da ação principal e largura compacta. Homologação com leitor de tela e usuários reais permanece no piloto.
 
 Aceite: administrador da empresa executa a rotina sem intervenção técnica no banco; exportações correspondem aos filtros e permissões.
 
@@ -226,3 +226,5 @@ Validação do perfil agendamento: 55 testes backend aprovados, build web aprova
 - 30/09/2026: fluxo físico de não atendimento da nova interface confirmado pelo usuário no histórico. A API registrou `nao_atendida` uma única vez; motivo preservado no evento auditado. Revisão detectou que o botão `Últimos 6 meses` consultava uma API limitada a 31 dias; limite ampliado para 184 dias inclusivos, teste de fronteira aprovado e consulta autenticada no servidor reiniciado retornou atendimentos com nome do cliente. A APK não precisou de alteração nesta correção.
 
 - 30/09/2026: gestão de acessos administrativos entregue no painel. O administrador lista/cria/bloqueia/reativa usuários, redefine senhas e encerra sessões; cada usuário administrativo pode trocar a própria senha informando a atual. Tentativas de bloquear a própria conta ou alterar contas de outra empresa são recusadas. Validação: 57 testes backend, build frontend e smoke HTTP local de login/listagem aprovados. API local reiniciada; o painel segue disponível em `http://127.0.0.1:5173/`. Não houve alteração no APK nesta entrega. Permanecem recuperação sem administrador, gestão de empresa/modalidades, relatórios e os demais itens abertos.
+
+- 30/09/2026: concluídos os três ajustes administrativos solicitados. Nome/fuso e modalidades gerenciáveis por administrador; recuperação autônoma por códigos de uso único; CSV/PDF filtrados com totais e proteção CSV; Visão do dia; melhorias de foco, teclado, estados e contraste. Migração 012 aplicada no banco local; provisionamento de empresa por CLI documentado em `docs/gestao-relatorios.md`. Validação: 61 testes backend completos, build do painel, smoke HTTP local de seis endpoints, renderização e leitura de PDF curto, multipágina e com 50 modalidades e inspeção da tela de recuperação em 360 px. APK Android não mudou. Restam as etapas 1/3/5/6/7/9/10 e testes físicos do piloto, sem considerar estes três ajustes pendentes.

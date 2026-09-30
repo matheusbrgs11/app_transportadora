@@ -9,7 +9,8 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "psycopg[binary]>=3.2,<4",
   "pwdlib[argon2]>=0.3,<1", "PyJWT>=2.10,<3", "python-multipart>=0.0.20,<1",
-  "openpyxl>=3.1.5,<4", "defusedxml>=0.7.1,<1", "email-validator>=2.2,<3"
+  "openpyxl>=3.1.5,<4", "defusedxml>=0.7.1,<1", "email-validator>=2.2,<3",
+  "reportlab>=4.2,<5"
 ]
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "httpx>=0.28,<1"]

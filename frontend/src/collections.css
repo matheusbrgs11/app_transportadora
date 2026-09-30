@@ -47,3 +47,7 @@ textarea:focus-visible{outline:3px solid #fa9b68;outline-offset:3px}
 .audit-section p{font-size:.875rem;margin-top:6px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:1100px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.history-filters{padding:16px;gap:14px}.history-filters>.customer-picker{grid-column:1/-1}.history-totals{gap:14px;padding:16px}.history-totals>span{font-size:.8rem}.history-time-note{padding:12px 16px}.history-breakdown{padding:16px}.volume-fields{grid-template-columns:1fr 1fr}.volume-fields>.field:first-child{grid-column:1/-1}.volume-fields>.icon-button{grid-column:2;justify-self:end}.detail-grid{grid-template-columns:1fr}.collection-detail-head .push-right{margin-left:0}.collection-action-form{padding:16px}.collection-actions>button{flex:1}.section-inline .text-button{font-size:.8rem}}
+.history-export{background:#fafcfd;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.history-export .history-time-note{border:0}
+.history-export>div{display:flex;gap:8px;padding-right:22px}
+@media(max-width:760px){.history-export>div{padding:0 16px 14px;width:100%}.history-export>div>button{flex:1}}

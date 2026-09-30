@@ -7,3 +7,30 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .user-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 .modal-body>.field+.field{margin-top:18px}
+.settings-form{padding:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:end}
+.settings-form>.helper{grid-column:1/-1}
+.settings-form>.primary{justify-self:start}
+.settings-panel{margin-top:22px}
+.overview-grid{padding:23px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.overview-card{border:1px solid var(--line);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:12px;color:#5d7a89}
+.overview-card strong{font:800 2rem Manrope,system-ui,sans-serif;color:var(--navy)}
+.overview-card span{font-size:.875rem}
+.overview-bottom{border-top:1px solid var(--line);padding:20px 23px;display:flex;justify-content:space-between;align-items:center;gap:20px;color:var(--muted);font-size:.875rem}
+.recovery-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:18px 0}
+.recovery-codes code{display:block;overflow-wrap:anywhere;border:1px solid var(--line);background:var(--soft);padding:10px;border-radius:6px;font-size:.8rem}
+.recovery-actions{margin-top:18px}
+.login-switch{display:flex;margin:17px auto 0}
+.success-note{color:#276d4a;background:#eaf5ef;padding:12px;border-radius:6px;margin-bottom:15px!important}
+.skip-link{position:absolute;left:12px;top:-100px;z-index:200;padding:12px;background:white;color:var(--navy);border-radius:7px}
+.skip-link:focus{top:12px}
+.sidebar{overflow-y:auto}
+.sidebar-foot>button{min-height:42px}
+@media(max-width:760px){.settings-form{grid-template-columns:1fr;padding:16px}.overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:16px}.overview-card{padding:16px}.overview-bottom{padding:16px;flex-direction:column;align-items:stretch}.recovery-codes{grid-template-columns:1fr}.user-actions{min-width:170px}}
+@media(max-width:390px){.overview-grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stat{display:flex}.stat-icon{display:grid}.history-export{align-items:stretch}}
+.primary,.secondary{min-height:44px}
+.primary{background:#b84a18}
+.primary:hover:not(:disabled){background:#9e3e10}
+.icon-button{min-width:44px;height:44px}
+.sidebar-foot>button{min-height:44px}
+a:focus-visible,summary:focus-visible,textarea:focus-visible{outline:3px solid #fa9b68;outline-offset:3px}
+@media(pointer:coarse){.text-button,.drag-handle,.stop-arrows .icon-button{min-height:44px;min-width:44px}.stop-arrows .icon-button{width:44px;height:44px}}

@@ -173,6 +173,34 @@ def create_collection(body, response, auth, source=None):
     return collection_detail(conn,cid)
 
 
+def history_filter(conn,user,cliente_id=None,motorista_id=None,modalidade_id=None,
+                   data_inicio=None,data_fim=None,status=None,origem=None,quantidade_status=None):
+    if data_inicio and data_fim and data_inicio>data_fim:
+        raise HTTPException(422,'A data inicial deve ser anterior ou igual à final.')
+    zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
+    where=[];params=[]
+    for field,value in [('cliente_id',cliente_id),('motorista_id',motorista_id),('status',status),('origem',origem)]:
+        if value is not None:
+            where.append(f'c.{field}=%s');params.append(value)
+    ref='coalesce(c.concluida_em,c.agendada_para,c.criado_em)'
+    if data_inicio:
+        where.append(ref+'>=%s');params.append(datetime.combine(data_inicio,time.min,ZoneInfo(zone)))
+    if data_fim:
+        if data_fim==date.max:
+            raise HTTPException(422,'Data final fora do intervalo permitido.')
+        where.append(ref+'<%s');params.append(datetime.combine(data_fim+timedelta(days=1),time.min,ZoneInfo(zone)))
+    item_where=[];item_params=[]
+    if modalidade_id:
+        item_where.append('i.modalidade_id=%s');item_params.append(modalidade_id)
+    if quantidade_status:
+        item_where.append('i.quantidade_status=%s');item_params.append(quantidade_status)
+    if item_where:
+        where.append('EXISTS(SELECT 1 FROM coleta_itens i WHERE i.coleta_id=c.id AND '+' AND '.join(item_where)+')')
+        params.extend(item_params)
+    clause=' WHERE '+' AND '.join(where) if where else ''
+    return zone,clause,params,item_where,item_params
+
+
 def register_collections(app,staff,admin):
     @app.get('/modalidades',tags=['Coletas'])
     def modalities(auth=Depends(staff)):
@@ -187,30 +215,9 @@ def register_collections(app,staff,admin):
                 data_inicio:date|None=None,data_fim:date|None=None,status:Status|None=None,
                 origem:Origin|None=None,quantidade_status:QuantityStatus|None=None,
                 limit:int=Query(20,ge=1,le=100),offset:int=Query(0,ge=0),auth=Depends(staff)):
-        if data_inicio and data_fim and data_inicio>data_fim:
-            raise HTTPException(422,'A data inicial deve ser anterior ou igual à final.')
         conn,user,_=auth
-        zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
-        where=[]; params=[]
-        for field,value in [('cliente_id',cliente_id),('motorista_id',motorista_id),('status',status),('origem',origem)]:
-            if value is not None:
-                where.append(f'c.{field}=%s');params.append(value)
-        ref='coalesce(c.concluida_em,c.agendada_para,c.criado_em)'
-        if data_inicio:
-            where.append(ref+'>=%s');params.append(datetime.combine(data_inicio,time.min,ZoneInfo(zone)))
-        if data_fim:
-            if data_fim==date.max:
-                raise HTTPException(422,'Data final fora do intervalo permitido.')
-            where.append(ref+'<%s');params.append(datetime.combine(data_fim+timedelta(days=1),time.min,ZoneInfo(zone)))
-        item_where=[]; item_params=[]
-        if modalidade_id:
-            item_where.append('i.modalidade_id=%s');item_params.append(modalidade_id)
-        if quantidade_status:
-            item_where.append('i.quantidade_status=%s');item_params.append(quantidade_status)
-        if item_where:
-            where.append('EXISTS(SELECT 1 FROM coleta_itens i WHERE i.coleta_id=c.id AND '+' AND '.join(item_where)+')')
-            params.extend(item_params)
-        clause=' WHERE '+' AND '.join(where) if where else ''
+        zone,clause,params,item_where,item_params=history_filter(conn,user,cliente_id,motorista_id,
+            modalidade_id,data_inicio,data_fim,status,origem,quantidade_status)
         filtered='WITH filtered AS (SELECT c.* FROM coletas c'+clause+') '
         totals=conn.execute(filtered+'''SELECT count(*) AS total,
             count(*) FILTER(WHERE status='concluida') AS concluidas,

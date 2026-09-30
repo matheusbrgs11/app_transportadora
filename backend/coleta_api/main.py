@@ -1,6 +1,9 @@
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+import hmac
 from pathlib import Path
+import secrets
 from threading import Lock
 from time import monotonic
 from uuid import UUID, uuid4
@@ -16,7 +19,7 @@ from psycopg.types.json import Jsonb
 from pwdlib import PasswordHash
 from .config import Settings
 from .db import transaction
-from .models import Client, Login, UserCreate, Confirmation, PasswordChange, PasswordReset, UserAccess
+from .models import Client, Login, UserCreate, Confirmation, PasswordChange, PasswordReset, UserAccess, PasswordRecovery, RecoveryGenerate
 from .importer import preview, MAX_BYTES
 from .operations import register_operations
 from .collections import register_collections
@@ -26,6 +29,8 @@ from .offline import register_offline
 from .proofs import register_proofs
 from .locations import register_locations
 from .tracking import register_tracking
+from .company import register_company
+from .reports import register_reports
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -47,6 +52,23 @@ def create_app(settings: Settings | None = None):
     app = FastAPI(title='Coleta — API', version='0.1.0', description='Gestão de clientes por transportadora. Informe o ID da empresa no login e use o token em Authorize.')
     attempts = defaultdict(deque)
     attempts_lock = Lock()
+
+    def limit_auth(request: Request):
+        now_mono = monotonic()
+        key = request.client.host if request.client else 'local'
+        with attempts_lock:
+            for oldkey in list(attempts):
+                if not attempts[oldkey] or attempts[oldkey][-1] < now_mono-60:
+                    del attempts[oldkey]
+            queue = attempts[key]
+            while queue and queue[0] < now_mono-60:
+                queue.popleft()
+            if len(queue)>=15:
+                raise HTTPException(429,'Muitas tentativas. Aguarde um minuto.',headers={'Retry-After':'60'})
+            queue.append(now_mono)
+
+    def recovery_hash(code: str) -> str:
+        return hmac.new(settings.jwt_secret.encode(),code.encode(),sha256).hexdigest()
 
     @app.exception_handler(IntegrityError)
     async def integrity_error(request,exc):
@@ -98,19 +120,7 @@ def create_app(settings: Settings | None = None):
 
     @app.post('/auth/login',tags=['Autenticação'])
     def login(body: Login,request: Request):
-        now_mono = monotonic()
-        key = request.client.host if request.client else 'local'
-        with attempts_lock:
-            # Limite por IP para esta instância, inclusive para empresas/logins inexistentes.
-            for oldkey in list(attempts):
-                if not attempts[oldkey] or attempts[oldkey][-1] < now_mono-60:
-                    del attempts[oldkey]
-            queue = attempts[key]
-            while queue and queue[0] < now_mono-60:
-                queue.popleft()
-            if len(queue)>=15:
-                raise HTTPException(429,'Muitas tentativas. Aguarde um minuto.',headers={'Retry-After':'60'})
-            queue.append(now_mono)
+        limit_auth(request)
         with transaction(settings,body.empresa_id) as conn:
             user = conn.execute('''SELECT u.* FROM usuarios u JOIN empresas e ON e.id=u.empresa_id
                 WHERE u.login=%s AND u.ativo AND e.ativa''',(body.usuario_login.strip().lower(),)).fetchone()
@@ -144,6 +154,41 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(400,'Senha atual incorreta.')
         conn.execute('UPDATE usuarios SET senha_hash=%s WHERE id=%s',(PASSWORDS.hash(body.nova_senha),user['id']))
         conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user['id'],))
+        conn.execute('DELETE FROM codigos_recuperacao WHERE usuario_id=%s',(user['id'],))
+
+    @app.get('/auth/recuperacao/codigos',tags=['Autenticação'])
+    def recovery_code_count(auth=Depends(authenticated)):
+        conn,user,_=auth
+        count=conn.execute('SELECT count(*) AS total FROM codigos_recuperacao WHERE usuario_id=%s',(user['id'],)).fetchone()['total']
+        return {'total':count}
+
+    @app.post('/auth/recuperacao/codigos',tags=['Autenticação'])
+    def generate_recovery_codes(body: RecoveryGenerate,auth=Depends(authenticated)):
+        conn,user,_=auth
+        current=conn.execute('SELECT senha_hash FROM usuarios WHERE id=%s FOR UPDATE',(user['id'],)).fetchone()
+        if not PASSWORDS.verify(body.senha_atual,current['senha_hash']):
+            raise HTTPException(400,'Senha atual incorreta.')
+        codes=[secrets.token_urlsafe(24) for _ in range(8)]
+        conn.execute('DELETE FROM codigos_recuperacao WHERE usuario_id=%s',(user['id'],))
+        conn.cursor().executemany('''INSERT INTO codigos_recuperacao(empresa_id,usuario_id,codigo_hash)
+            VALUES (%s,%s,%s)''',[(user['empresa_id'],user['id'],recovery_hash(code)) for code in codes])
+        return {'codigos':codes}
+
+    @app.post('/auth/recuperacao',status_code=204,tags=['Autenticação'])
+    def recover_password(body: PasswordRecovery,request: Request):
+        limit_auth(request)
+        with transaction(settings,body.empresa_id) as conn:
+            user=conn.execute('''SELECT u.id,u.senha_hash FROM usuarios u JOIN empresas e ON e.id=u.empresa_id
+                WHERE u.login=%s AND u.ativo AND e.ativa FOR UPDATE OF u''',(body.usuario_login.strip().lower(),)).fetchone()
+            if not user:
+                raise HTTPException(400,'Dados de recuperação inválidos.')
+            consumed=conn.execute('''DELETE FROM codigos_recuperacao WHERE usuario_id=%s AND codigo_hash=%s
+                RETURNING id''',(user['id'],recovery_hash(body.codigo.strip()))).fetchone()
+            if not consumed:
+                raise HTTPException(400,'Dados de recuperação inválidos.')
+            conn.execute('UPDATE usuarios SET senha_hash=%s WHERE id=%s',(PASSWORDS.hash(body.nova_senha),user['id']))
+            conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user['id'],))
+            conn.execute('DELETE FROM codigos_recuperacao WHERE usuario_id=%s',(user['id'],))
 
     @app.post('/usuarios',status_code=201,tags=['Usuários'])
     def create_user(body: UserCreate,auth=Depends(admin)):
@@ -182,6 +227,7 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(409,'Para trocar sua senha, informe a senha atual em Minha conta.')
         conn.execute('UPDATE usuarios SET senha_hash=%s WHERE id=%s',(PASSWORDS.hash(body.nova_senha),user_id))
         conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user_id,))
+        conn.execute('DELETE FROM codigos_recuperacao WHERE usuario_id=%s',(user_id,))
 
     @app.get('/clientes',tags=['Clientes'])
     def clients(q: str = Query('',max_length=150),ativo: bool | None=None,
@@ -273,5 +319,7 @@ def create_app(settings: Settings | None = None):
     register_daily(app,staff)
     register_driver_day(app,authenticated)
     register_operations(app,staff,admin,PASSWORDS)
+    register_company(app,staff,admin)
+    register_reports(app,staff)
     register_collections(app,staff,admin)
     return app

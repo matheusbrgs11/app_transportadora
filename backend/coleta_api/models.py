@@ -107,3 +107,15 @@ class PasswordReset(StrictModel):
 
 class UserAccess(StrictModel):
     ativo: bool
+
+
+class PasswordRecovery(StrictModel):
+    model_config = ConfigDict(extra='forbid',str_strip_whitespace=False)
+    empresa_id: UUID
+    usuario_login: str = Field(min_length=1,max_length=150)
+    codigo: str = Field(min_length=24,max_length=100)
+    nova_senha: str = Field(min_length=12,max_length=256)
+
+
+class RecoveryGenerate(StrictModel):
+    senha_atual: str = Field(min_length=1,max_length=256)
