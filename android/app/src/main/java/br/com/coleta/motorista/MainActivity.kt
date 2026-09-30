@@ -28,10 +28,11 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private enum class Tab { COLETAS, CLIENTES, HISTORICO, MAIS }
-    private val navy=Color.rgb(20,42,68)
-    private val blue=Color.rgb(25,95,180)
-    private val muted=Color.rgb(91,107,125)
-    private val backgroundColor=Color.rgb(245,248,252)
+    private val navy=Color.rgb(21,45,59)
+    private val orange=Color.rgb(237,103,44)
+    private val muted=Color.rgb(104,124,137)
+    private val line=Color.rgb(228,234,238)
+    private val backgroundColor=Color.rgb(243,246,248)
     private val dateFormat=DateTimeFormatter.ofPattern("EEEE, dd 'de' MMMM 'de' yyyy",Locale("pt","BR"))
     private lateinit var layout: LinearLayout
     private lateinit var root: LinearLayout
@@ -46,6 +47,8 @@ class MainActivity : Activity() {
     private lateinit var vault: SessionVault
     override fun onCreate(state: Bundle?) {
         super.onCreate(state); store = Store(this); vault=SessionVault(this)
+        window.statusBarColor=navy
+        window.navigationBarColor=navy
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         if (vault.valid()!=null) unlockSaved() else login()
     }
@@ -85,6 +88,23 @@ class MainActivity : Activity() {
     }
     private fun page(title: String, tab: Tab? = null) {
         root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setBackgroundColor(backgroundColor) }
+        val top=LinearLayout(this).apply {
+            orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL
+            setBackgroundColor(navy);setPadding(dp(20),dp(10),dp(20),dp(10))
+        }
+        val brandMark=TextView(this).apply {
+            text="▣";textSize=24f;gravity=Gravity.CENTER;setTextColor(Color.WHITE)
+            background=rounded(orange,10f)
+        }
+        top.addView(brandMark,LinearLayout.LayoutParams(dp(40),dp(40)))
+        top.addView(TextView(this).apply {
+            text="coleta.";textSize=24f;setTypeface(null,Typeface.BOLD);setTextColor(Color.WHITE)
+            setPadding(dp(10),0,0,0)
+        })
+        top.addView(TextView(this).apply {
+            text="MOTORISTA";textSize=11f;letterSpacing=.12f;setTextColor(Color.rgb(175,197,209));gravity=Gravity.END
+        },LinearLayout.LayoutParams(0,-2,1f))
+        root.addView(top,LinearLayout.LayoutParams(-1,dp(64)))
         layout=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(18),dp(20),dp(28)) }
         val scroll=ScrollView(this).apply { isFillViewport=true;addView(layout) }
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
@@ -102,7 +122,7 @@ class MainActivity : Activity() {
         val outer=layout
         val content=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(16))
-            background=rounded(Color.WHITE,18f,Color.rgb(224,232,240))
+            background=rounded(Color.WHITE,11f,line)
         }
         outer.addView(content,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
         layout=content
@@ -110,21 +130,30 @@ class MainActivity : Activity() {
     }
     private fun bottomNavigation(current: Tab) {
         val bar=LinearLayout(this).apply {
-            orientation=LinearLayout.HORIZONTAL;setPadding(dp(8),dp(7),dp(8),dp(7));setBackgroundColor(Color.WHITE)
+            orientation=LinearLayout.HORIZONTAL;setPadding(dp(6),dp(5),dp(6),dp(5));setBackgroundColor(navy)
         }
-        val items=listOf(Triple(Tab.COLETAS,"Coletas","📦"),Triple(Tab.CLIENTES,"Clientes","👤"),
-            Triple(Tab.HISTORICO,"Histórico","🕒"),Triple(Tab.MAIS,"Mais","☰"))
+        val items=listOf(Triple(Tab.COLETAS,"Coletas",R.drawable.ic_tab_coletas),Triple(Tab.CLIENTES,"Clientes",R.drawable.ic_tab_clientes),
+            Triple(Tab.HISTORICO,"Histórico",R.drawable.ic_tab_historico),Triple(Tab.MAIS,"Mais",R.drawable.ic_tab_mais))
         for((tab,label,icon) in items) {
-            val item=TextView(this).apply {
-                text="$icon\n$label";textSize=13f;gravity=Gravity.CENTER
-                setTypeface(null,if(tab==current) Typeface.BOLD else Typeface.NORMAL)
-                setTextColor(if(tab==current) blue else muted)
+            val selected=tab==current
+            val item=LinearLayout(this).apply {
+                orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER
+                background=if(selected) rounded(Color.rgb(42,66,80),9f) else rounded(navy,9f)
                 contentDescription=label
                 setOnClickListener { if(!busy && sessionAllowed()) when(tab) {
                     Tab.COLETAS -> home();Tab.CLIENTES -> clients();Tab.HISTORICO -> historyHome();Tab.MAIS -> more()
                 } }
             }
-            bar.addView(item,LinearLayout.LayoutParams(0,dp(60),1f))
+            item.addView(ImageView(this).apply {
+                setImageResource(icon);setColorFilter(if(selected) orange else Color.rgb(183,200,211))
+            },LinearLayout.LayoutParams(dp(21),dp(21)))
+            item.addView(TextView(this).apply {
+                text=label;textSize=12f;gravity=Gravity.CENTER
+                setTypeface(null,if(selected) Typeface.BOLD else Typeface.NORMAL)
+                setTextColor(if(selected) Color.WHITE else Color.rgb(183,200,211))
+                setPadding(0,dp(4),0,0)
+            })
+            bar.addView(item,LinearLayout.LayoutParams(0,dp(62),1f).apply { leftMargin=dp(2);rightMargin=dp(2) })
         }
         root.addView(bar,LinearLayout.LayoutParams(-1,-2))
     }
@@ -134,17 +163,19 @@ class MainActivity : Activity() {
             it.isSingleLine = true
             it.inputType = if (secret) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD else InputType.TYPE_CLASS_TEXT
             it.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            it.setPadding(dp(12),0,dp(12),0);it.background=rounded(Color.WHITE,7f,line)
+            it.minHeight=dp(48)
             layout.addView(it)
         }
     }
     private fun button(label: String, action: () -> Unit) = Button(this).also {
         it.text=label;it.textSize=16f;it.isAllCaps=false;it.minHeight=dp(52)
-        it.setTextColor(Color.WHITE);it.background=rounded(blue,14f)
+        it.setTextColor(Color.WHITE);it.background=rounded(orange,8f)
         it.setOnClickListener { if (!busy && sessionAllowed()) action() }
         layout.addView(it,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
     }
     private fun secondaryButton(label: String, action: () -> Unit)=button(label,action).apply {
-        setTextColor(blue);background=rounded(Color.rgb(233,242,254),14f)
+        setTextColor(navy);background=rounded(Color.WHITE,8f,line)
     }
     private fun message(value: String) { AlertDialog.Builder(this).setMessage(value).setPositiveButton("OK",null).show() }
     private fun background(work: () -> Unit, done: () -> Unit) {
