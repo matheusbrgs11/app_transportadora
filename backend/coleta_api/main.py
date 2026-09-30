@@ -16,7 +16,7 @@ from psycopg.types.json import Jsonb
 from pwdlib import PasswordHash
 from .config import Settings
 from .db import transaction
-from .models import Client, Login, UserCreate, Confirmation
+from .models import Client, Login, UserCreate, Confirmation, PasswordChange, PasswordReset, UserAccess
 from .importer import preview, MAX_BYTES
 from .operations import register_operations
 from .collections import register_collections
@@ -136,12 +136,52 @@ def create_app(settings: Settings | None = None):
         conn,user,session_id = auth
         conn.execute('UPDATE sessoes SET revogada=true WHERE id=%s',(session_id,))
 
+    @app.post('/auth/senha',status_code=204,tags=['Autenticação'])
+    def change_password(body: PasswordChange,auth=Depends(authenticated)):
+        conn,user,_ = auth
+        current=conn.execute('SELECT senha_hash FROM usuarios WHERE id=%s FOR UPDATE',(user['id'],)).fetchone()
+        if not PASSWORDS.verify(body.senha_atual,current['senha_hash']):
+            raise HTTPException(400,'Senha atual incorreta.')
+        conn.execute('UPDATE usuarios SET senha_hash=%s WHERE id=%s',(PASSWORDS.hash(body.nova_senha),user['id']))
+        conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user['id'],))
+
     @app.post('/usuarios',status_code=201,tags=['Usuários'])
     def create_user(body: UserCreate,auth=Depends(admin)):
         conn,user,_ = auth
         return conn.execute('''INSERT INTO usuarios(empresa_id,nome,login,senha_hash,perfil)
             VALUES (%s,%s,%s,%s,%s) RETURNING id,nome,login,perfil,ativo''',
             (user['empresa_id'],body.nome,body.login.strip().lower(),PASSWORDS.hash(body.senha),body.perfil)).fetchone()
+
+    @app.get('/usuarios',tags=['Usuários'])
+    def list_users(auth=Depends(admin)):
+        conn,_,_=auth
+        return {'items':conn.execute('''SELECT id,nome,login,perfil,ativo FROM usuarios
+            WHERE perfil <> 'motorista' ORDER BY nome,id''').fetchall()}
+
+    @app.put('/usuarios/{user_id}/acesso',tags=['Usuários'])
+    def set_user_access(user_id: UUID,body: UserAccess,auth=Depends(admin)):
+        conn,user,_=auth
+        target=conn.execute('SELECT id,perfil,ativo FROM usuarios WHERE id=%s FOR UPDATE',(user_id,)).fetchone()
+        if not target or target['perfil']=='motorista':
+            raise HTTPException(404,'Acesso administrativo não encontrado.')
+        if user_id==user['id'] and not body.ativo:
+            raise HTTPException(409,'Você não pode bloquear seu próprio acesso.')
+        row=conn.execute('UPDATE usuarios SET ativo=%s WHERE id=%s RETURNING id,nome,login,perfil,ativo',
+            (body.ativo,user_id)).fetchone()
+        if not body.ativo:
+            conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user_id,))
+        return row
+
+    @app.post('/usuarios/{user_id}/senha',status_code=204,tags=['Usuários'])
+    def reset_user_password(user_id: UUID,body: PasswordReset,auth=Depends(admin)):
+        conn,user,_=auth
+        target=conn.execute('SELECT id,perfil FROM usuarios WHERE id=%s FOR UPDATE',(user_id,)).fetchone()
+        if not target or target['perfil']=='motorista':
+            raise HTTPException(404,'Acesso administrativo não encontrado.')
+        if user_id==user['id']:
+            raise HTTPException(409,'Para trocar sua senha, informe a senha atual em Minha conta.')
+        conn.execute('UPDATE usuarios SET senha_hash=%s WHERE id=%s',(PASSWORDS.hash(body.nova_senha),user_id))
+        conn.execute('UPDATE sessoes SET revogada=true WHERE usuario_id=%s AND NOT revogada',(user_id,))
 
     @app.get('/clientes',tags=['Clientes'])
     def clients(q: str = Query('',max_length=150),ativo: bool | None=None,

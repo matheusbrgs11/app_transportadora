@@ -94,3 +94,16 @@ class UserCreate(StrictModel):
         if not value:
             raise ValueError('Campo obrigatório.')
         return value
+
+
+class PasswordChange(StrictModel):
+    senha_atual: str = Field(min_length=1,max_length=256)
+    nova_senha: str = Field(min_length=12,max_length=256)
+
+
+class PasswordReset(StrictModel):
+    nova_senha: str = Field(min_length=12,max_length=256)
+
+
+class UserAccess(StrictModel):
+    ativo: bool
