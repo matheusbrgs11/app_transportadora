@@ -1,6 +1,6 @@
 # Plano de conclusão do Coleta — versão comercial inicial
 
-Atualizado em 27/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
+Atualizado em 30/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
 
 ## Como seguir este plano
 
@@ -17,12 +17,12 @@ Conclusão significa uma primeira versão comercial multiempresa com os fluxos a
 - [x] Código Android com cache/fila SQLite, registro de volumes e envio manual; APK debug compilado.
 - [x] Prévia web fictícia e repositório GitHub com o trabalho.
 
-Evidências já registradas: 34 testes de backend aprovados na última execução documentada, build web e APK debug compilados, importação pela interface conferida. Não foram repetidos nesta atualização de planejamento. Android ainda sem homologação em aparelho; sem nuvem operacional, rubrica, rastreamento ou chamados.
+Evidências recentes estão no Registro de evolução. Android já foi testado no Samsung com coleta online/offline, assinatura, histórico, não atendimento e rastreamento por turno. Ainda faltam os cenários físicos indicados abaixo, nuvem operacional e chamados imprevistos.
 
 ## 1. Homologar a base Android
 
 - [ ] Configurar emulador sem exigir Android Studio, se houver virtualização e recursos; manter teste em aparelho real como requisito antes do piloto.
-- [ ] Testar login de motorista, rota correta, registro de visita e aparecimento no painel/histórico.
+- [x] Testar login de motorista, rota correta, registro de visita e aparecimento no painel/histórico.
 - [ ] Conferir isolamento entre contas/empresas também no cache e na fila do aparelho.
 - [ ] Testar tela pequena, teclado, acessibilidade, voltar, rotação, encerramento e reabertura; corrigir falhas e preservar rascunhos.
 - [ ] Registrar procedimento de teste reproduzível e evidências.
@@ -38,7 +38,7 @@ Aceite: fluxo Android → API → painel funcionando; nenhuma perda de registro 
 - [x] Progresso da execução no painel e no Android; histórico próprio do motorista de hoje/últimos sete dias, paginado. Atualização manual.
 - [x] Transferência individual de atendimentos pendentes da rota, planejamento preservado, nova tentativa autorizada sem apagar a anterior e concorrência entre aparelhos com auditoria.
 
-Homologação Android → API → painel ainda pendente (etapa 1).
+Fluxo Android → API → histórico validado no aparelho; demais cenários de homologação da etapa 1 continuam abertos.
 
 Aceite: uma visita planejada tem identidade estável até o histórico; reenvios e aparelhos simultâneos não duplicam o atendimento; revisitas legítimas são explícitas.
 
@@ -60,7 +60,7 @@ Aceite: registros salvos sobrevivem aos cenários de falha, voltam ao servidor s
 - [x] Rascunho de traços/metadados e imagem PNG confirmada preservados no SQLite; imagem e coleta viajam no mesmo payload imutável da fila.
 - [x] PNG privado no PostgreSQL com RLS, limite de 128 KB/1024×512, estrutura/CRC/descompressão limitada validados e gravação atômica com coleta. Comprovante append-only por coleta.
 - [x] Consulta administrativa autenticada, rubrica/justificativa e download HTML autocontido para impressão/salvar PDF pelo navegador. Snapshot original e hash preservados; imagens não são copiadas para eventos.
-- [x] Testes de PNG inválido/truncado, reenvio, isolamento, resposta perdida e rollback após gravar comprovante. Interoperabilidade PNG Android → validador API conferida. Homologação física permanece na etapa 1.
+- [x] Testes de PNG inválido/truncado, reenvio, isolamento, resposta perdida e rollback após gravar comprovante. Interoperabilidade PNG Android → validador API e assinatura física enviada e recuperada no teste Samsung.
 
 Aceite: comprovante correto recuperável, sem imagem pública nem perda após confirmação local. Revisão jurídica do texto e uso do comprovante na etapa 9; não presumir validade jurídica apenas pela captura.
 
