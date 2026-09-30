@@ -4,6 +4,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -29,6 +30,7 @@ class DailyUiTest {
         val first=UUID.randomUUID().toString(); val second=UUID.randomUUID().toString()
         val route=UUID.randomUUID().toString(); val client=UUID.randomUUID().toString()
         val store=Store(context)
+        store.tracking("a",JSONObject().put("state","active"))
         store.save("a",JSONObject().put("id_local_dispositivo",UUID.randomUUID().toString())
             .put("coleta_id",first).put("rota_id",route).put("cliente_id",client).put("concluida_em","2026-05-07T12:00:00Z"))
         fun stop(id:String,attempt:Int,status:String)=JSONObject().put("coleta_id",id).put("cliente_id",client)
@@ -39,6 +41,9 @@ class DailyUiTest {
         set(a,"owner","a");set(a,"day",plan)
         MainActivity::class.java.getDeclaredMethod("home").apply { isAccessible=true }.invoke(a)
         fun buttons()=views(a.findViewById(android.R.id.content)).filterIsInstance<Button>()
+        assertTrue(views(a.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .any { it.text.toString()=="Turno em andamento" })
+        assertTrue(buttons().any { it.text.toString()=="Finalizar turno" })
         assertEquals(1,buttons().count { it.text.toString()=="Realizar coleta" })
         buttons().single { it.text.toString()=="Não foi possível atender" }.performClick()
         views(a.findViewById(android.R.id.content)).filterIsInstance<EditText>().single().setText("Portaria fechada")
