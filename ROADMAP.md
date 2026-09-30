@@ -19,7 +19,19 @@ Conclusão significa uma primeira versão comercial multiempresa com os fluxos a
 
 Evidências recentes estão no Registro de evolução. Android já foi testado no Samsung com coleta online/offline, assinatura, histórico, não atendimento e rastreamento por turno. Ainda faltam os cenários físicos indicados abaixo, nuvem operacional e chamados imprevistos.
 
+## Ordem prática a partir de agora
+
+As etapas 2, 4 e 8 estão implementadas. As etapas 1 e 3 dependem principalmente de testes adicionais no Android; as etapas 5 e parte da 6 dependem de um projeto Google Cloud; a 9 depende da escolha de hospedagem e do projeto Supabase. Essas dependências não impedem desenvolver os chamados imprevistos da etapa 7. A sequência de trabalho mais útil é: terminar o fluxo de chamados em código e teste local; repetir os cenários físicos de Android, offline e GPS; integrar e homologar mapas quando houver Google Cloud; colocar um ambiente de homologação na nuvem; executar o piloto e corrigir seus bloqueadores. Preparativos de segurança, automação e documentação da etapa 9 podem avançar em paralelo. Nenhuma compra ou ativação de serviço pago está autorizada por este plano.
+
+Para cada etapa aberta, as caixas abaixo indicam o trabalho específico. O texto de abertura explica o resultado esperado, o modo de verificar e o que ainda depende do usuário ou de serviços externos. Uma etapa só será marcada como concluída quando o fluxo correspondente funcionar com evidência, não apenas porque o código foi escrito.
+
 ## 1. Homologar a base Android
+
+**Resultado esperado:** um motorista consegue entrar, consultar sua rota, registrar atendimento com assinatura, reabrir o aplicativo e encontrar os dados corretos sem misturar contas. O fluxo principal já funcionou no Samsung; esta etapa agora cobre os cantos de uso que podem causar perda de rascunho ou confusão na tela.
+
+**Como verificar:** executar um roteiro curto em aparelho real com duas contas/empresas fictícias, alternando login e conferindo cache e fila locais; repetir em tela menor ou com fonte ampliada, teclado aberto, botão Voltar, rotação, bloqueio e reabertura. Registrar para cada cenário o resultado no aparelho e, quando houver envio, a coleta correspondente na API/painel. Se o emulador continuar indisponível por falta de KVM, isso será documentado sem substituir o teste físico.
+
+**Dependência:** aparelho Android disponível durante a sessão de testes. O desenvolvimento e os testes automatizados podem continuar sem o cabo.
 
 - [ ] Configurar emulador sem exigir Android Studio, se houver virtualização e recursos; manter teste em aparelho real como requisito antes do piloto.
 - [x] Testar login de motorista, rota correta, registro de visita e aparecimento no painel/histórico.
@@ -44,6 +56,12 @@ Aceite: uma visita planejada tem identidade estável até o histórico; reenvios
 
 ## 3. Completar operação offline
 
+**Resultado esperado:** uma coleta salva sem internet permanece no aparelho, indica claramente que aguarda envio e chega ao servidor uma única vez quando a conexão volta. Se houver conflito ou sessão inválida, o motorista vê o estado correto e a equipe consegue conferir o registro sem apagar o original.
+
+**Como verificar:** além dos testes já aprovados de cabo removido, reinício, logout/login e reenvio, executar o roteiro restante com modo avião, conexão oscilante, atualização de APK preservando dados, relógio alterado e virada do dia. Conferir no banco o identificador da coleta e a ausência de duplicatas após cada repetição. Testar a sincronização automática com Wi-Fi ou dados móveis contra API HTTPS, pois o encaminhamento USB não representa uma rede Android normal para o JobScheduler.
+
+**Dependência:** aparelho para os cenários locais; API HTTPS externa da etapa 9 para validar a sincronização automática em rede real.
+
 - [x] Planejamento, rascunhos e fila em SQLite privado, migração v1→v2, backup desativado e falhas de gravação sinalizadas. Sessão persistida usa AES-GCM/Android Keystore e requer bloqueio do aparelho. Validado com testes leves; homologação física continua pendente.
 - [x] Política de sessão de motorista de até 12 horas; renovação por novo login, logout local imediato e revogação no servidor quando online. Reabrir exige credencial do Android; reinício do aparelho, expiração ou alteração relevante do relógio exigem login online. Revogação remota é conhecida na próxima requisição autenticada.
 - [x] JobScheduler com rede obrigatória, tentativa imediata, repetição exponencial e verificação periódica. Sessão lembrada em aparelho com bloqueio é necessária; envio manual permanece disponível. Horário real depende do Android e deve ser homologado em aparelho.
@@ -66,6 +84,12 @@ Aceite: comprovante correto recuperável, sem imagem pública nem perda após co
 
 ## 5. Localizar clientes e abrir navegação
 
+**Resultado esperado:** o gestor identifica no mapa os clientes com localização confirmada, encontra endereços sem ponto confiável e o motorista abre o destino correto no Google Maps. Endereços ambíguos devem ir para conferência humana antes de virar coordenadas usadas na operação.
+
+**Como executar e verificar:** criar um projeto Google Cloud com cobrança e limites sob controle da empresa, restringir as chaves aos serviços e origens necessários e habilitar somente as APIs escolhidas. Implementar geocodificação sob demanda ou no cadastro, apresentar candidatos e permitir correção. Conferir uma amostra de endereços reais do piloto comparando endereço, pino e destino aberto no Android. Medir chamadas/custos e documentar as regras de armazenamento do provedor antes de guardar resultados.
+
+**Dependência:** o usuário ainda não possui projeto Google Cloud. A navegação por link já funciona sem chave; geocodificação e mapa incorporado ficam bloqueados até haver projeto e configuração de cobrança. Não comprar ou ativar serviços por conta própria.
+
 - [ ] Configurar projeto Google Cloud, chaves restritas, quotas, medição e alertas de custo. Usuário informou em 27/09/2026 que ainda não possui projeto. Nenhuma conta, API paga ou cobrança foi criada/ativada.
 - [x] Cadastro/correção/remoção manual de pontos fornecidos pelo cliente ou GPS em campo, com versão, motivo e auditoria. Alterar endereço invalida o ponto; execuções já emitidas preservam seu snapshot.
 - [ ] Geocodificar automaticamente e tratar candidatos ambíguos/inexistentes. Depende da configuração e política de armazenamento do provedor.
@@ -76,6 +100,12 @@ Aceite: comprovante correto recuperável, sem imagem pública nem perda após co
 Aceite: endereços do piloto conferidos e navegação para o destino esperado; sem prometer otimização automática de rotas nesta versão.
 
 ## 6. Rastreamento durante o turno
+
+**Resultado esperado:** durante um turno ativo, o operador vê a última posição de cada motorista, com horário e precisão, e sabe distinguir posição recente de posição antiga. Fora do turno não deve haver captura nem coordenada visível. O teste anterior confirmou envio e encerramento em aparelho; ainda falta medir comportamento por tempo maior e em condições adversas.
+
+**Como verificar:** fazer um percurso real controlado com tela acesa e bloqueada, registrar horário inicial/final, bateria e frequência das atualizações; repetir com economia de bateria, permissão retirada, GPS sem sinal e aplicativo em segundo plano. Confirmar que a posição some após encerrar o turno e que turnos expirados são limpos por tarefa agendada, sem depender de uma visita ao painel. Com Google Cloud configurado, exibir os motoristas simultaneamente no mapa e comparar pinos, horários e links de navegação.
+
+**Dependência:** aparelho em percurso real e, para o mapa incorporado, projeto Google Cloud. A política de retenção de localização precisa ser aprovada antes da produção; a implementação do job pode ser preparada sem contratar infraestrutura.
 
 - [x] Implementar início/fim de turno, permissões, explicação ao motorista e serviço Android com notificação de rastreamento.
 - [x] Implementar captura em serviço foreground e envio com intervalos de 30/60/120/300 segundos; falhas descartam posições antigas. Consumo de bateria e comportamento real do Android ainda dependem de homologação.
@@ -89,6 +119,14 @@ Aceite: endereços do piloto conferidos e navegação para o destino esperado; s
 Aceite: operação identifica localização e sua atualidade; não há rastreamento fora do turno no fluxo definido; consumo validado no piloto.
 
 ## 7. Chamados imprevistos
+
+**Resultado esperado:** quando um cliente pede coleta fora da rota fixa, a pessoa de agendamento cria um chamado, escolhe ou confirma um motorista e acompanha cada estado até a conclusão ou não atendimento. O motorista recebe o chamado no Android, pode aceitar ou recusar com motivo e o resultado entra no mesmo histórico de coletas, sem duplicar visita.
+
+**Como executar:** primeiro modelar chamado, estados, prazo e eventos auditados no backend; depois construir a tela de criação/despacho no painel e a caixa de chamados no Android. A sugestão inicial de motorista pode usar disponibilidade, tipo de veículo e distância aproximada a partir de uma posição recente, informando quando a posição estiver velha ou ausente. Cálculo de trajeto com Google Maps fica opcional até a etapa 5. Uma notificação apenas alerta: o painel só mostrará recebimento ou aceite após confirmação do aplicativo. Implementar expiração, recusa, reatribuição e bloqueio de edição concorrente.
+
+**Como verificar:** simular dois operadores, dois motoristas e um aparelho offline; despachar, receber, aceitar ou recusar, reatribuir e concluir. Conferir eventos e responsável final no histórico, incluindo reenvio idempotente após falha de rede. Repetir no aparelho e na API HTTPS quando a etapa 9 disponibilizar o servidor externo.
+
+**Dependência:** não exige Google Cloud para o fluxo básico. Notificação remota e teste fora do cabo dependem da infraestrutura externa; o fluxo local pode ser desenvolvido agora.
 
 - [ ] Criar chamado no painel com cliente, modalidade/volume esperado, prioridade e observações.
 - [ ] Sugerir motoristas por posição recente, disponibilidade, veículo e proximidade; calcular trajeto quando necessário.
@@ -113,6 +151,14 @@ Aceite: administrador da empresa executa a rotina sem intervenção técnica no 
 
 ## 9. Nuvem, segurança e operação
 
+**Resultado esperado:** painel e API ficam acessíveis por HTTPS sem computador ou cabo, com banco segregado por empresa, segredos protegidos, backup restaurável, monitoramento e procedimento de publicação/reversão. Esta etapa transforma o protótipo local em ambiente de homologação e depois em operação de produção; não é só apontar um domínio.
+
+**Sequência de trabalho:** definir região, capacidade, orçamento e hospedagem da API/painel; identificar o projeto Supabase de homologação; testar migrações, PostGIS, papéis, RLS e conexão TLS nesse projeto; publicar homologação com domínio/HTTPS; fazer smoke de login, coleta, assinatura, rastreamento e exportação por rede móvel. Em seguida preparar produção separada, backup/restauração, retenção, limites, logs/alertas e resposta a incidentes. Por fim automatizar testes, builds e migrações, criar chave de assinatura Android protegida e gerar uma versão release reproduzível.
+
+**Como verificar:** um celular fora da rede do computador acessa a API HTTPS; dados de uma empresa não aparecem em outra; uma cópia de backup restaura os registros esperados em ambiente isolado; uma versão nova pode ser publicada e revertida sem perder a fila do motorista. Registrar tempo de indisponibilidade e comportamento com carga próxima aos quatro motoristas iniciais, deixando margem para outras empresas.
+
+**Dependência:** projeto Supabase identificado e hospedagem/domínio definidos pelo usuário antes da publicação. Custos e serviços pagos serão apresentados para decisão antes da contratação. Revisão dos textos e práticas de privacidade, especialmente localização e assinatura, deve ocorrer antes de usar dados reais.
+
 - [ ] Definir capacidade inicial, orçamento, região e requisitos de disponibilidade; aprovar custos. Preferência do usuário: Supabase para PostgreSQL. Projeto ainda não identificado; hospedagem da API/painel ainda precisa ser definida.
 - [ ] Validar migrações, PostGIS, papéis/permissões, conexão TLS/pooler e isolamento no Supabase de homologação antes de usar produção. Não presumir compatibilidade de superusuário nem expor tabelas operacionais pela Data API.
 - [ ] Preparar homologação e produção separadas: API, painel, PostgreSQL/PostGIS e arquivos privados, com domínio/HTTPS.
@@ -128,6 +174,12 @@ Aceite: administrador da empresa executa a rotina sem intervenção técnica no 
 Aceite: operação funciona sem computador do desenvolvedor, restauração comprovada, acessos segregados e procedimento reproduzível de publicação/recuperação. Preparativos desta etapa podem ocorrer em paralelo; deve estar pronta antes do piloto com dados reais.
 
 ## 10. Piloto e lançamento comercial
+
+**Resultado esperado:** uma transportadora real usa a solução com quatro motoristas (três carros e uma moto) durante um período combinado, sem perda ou duplicação crítica de coletas. O gestor consegue planejar, acompanhar, corrigir, consultar histórico e exportar; o motorista consegue trabalhar com conexão normal e falhas temporárias.
+
+**Como executar e medir:** importar e conferir a base real, validar veículos/rotas e treinar gestor, agendamento e motoristas; realizar uma operação completa online e offline com assinatura, GPS e chamado imprevisto. Durante o piloto, registrar falhas, tempo de sincronização, bateria, chamadas de suporte, duplicações e acertos de endereço. Corrigir bloqueadores, repetir os cenários afetados e obter aceite explícito da transportadora para os fluxos críticos. Em paralelo, fechar preço, implantação, limites, suporte, retenção, cancelamento e cobrança; cadastrar uma segunda empresa para comprovar a operação multiempresa.
+
+**Dependência:** etapas funcionais e de nuvem aprovadas, dados e participantes reais autorizados. A publicação estável só ocorre após aceite do piloto, restauração de backup demonstrada e responsáveis por suporte/manutenção definidos.
 
 - [ ] Preparar uma empresa real, base validada, quatro motoristas (três carros e uma moto) e treinamento.
 - [ ] Rodar teste ponta a ponta online/offline, rubrica, rastreamento, chamados, histórico e exportação.
@@ -228,3 +280,5 @@ Validação do perfil agendamento: 55 testes backend aprovados, build web aprova
 - 30/09/2026: gestão de acessos administrativos entregue no painel. O administrador lista/cria/bloqueia/reativa usuários, redefine senhas e encerra sessões; cada usuário administrativo pode trocar a própria senha informando a atual. Tentativas de bloquear a própria conta ou alterar contas de outra empresa são recusadas. Validação: 57 testes backend, build frontend e smoke HTTP local de login/listagem aprovados. API local reiniciada; o painel segue disponível em `http://127.0.0.1:5173/`. Não houve alteração no APK nesta entrega. Permanecem recuperação sem administrador, gestão de empresa/modalidades, relatórios e os demais itens abertos.
 
 - 30/09/2026: concluídos os três ajustes administrativos solicitados. Nome/fuso e modalidades gerenciáveis por administrador; recuperação autônoma por códigos de uso único; CSV/PDF filtrados com totais e proteção CSV; Visão do dia; melhorias de foco, teclado, estados e contraste. Migração 012 aplicada no banco local; provisionamento de empresa por CLI documentado em `docs/gestao-relatorios.md`. Validação: 61 testes backend completos, build do painel, smoke HTTP local de seis endpoints, renderização e leitura de PDF curto, multipágina e com 50 modalidades e inspeção da tela de recuperação em 360 px. APK Android não mudou. Restam as etapas 1/3/5/6/7/9/10 e testes físicos do piloto, sem considerar estes três ajustes pendentes.
+
+- 30/09/2026: etapas abertas do roteiro detalhadas com resultado esperado, execução/verificação e dependências. A ordem prática destaca o que pode ser desenvolvido agora e o que depende de testes no Android, Google Cloud ou hospedagem.
