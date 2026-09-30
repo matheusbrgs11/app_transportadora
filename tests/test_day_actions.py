@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from uuid import uuid4
 from test_daily import issue, DAY
 from test_driver_visits import prepare as setup
@@ -83,7 +84,10 @@ def test_nonattendance_idempotence_history_and_revisit_chain(context,customer):
     assert all('cnpj' not in row and 'cliente_cnpj' not in row for row in history['items'])
     page=client.get('/motorista/historico?data_inicio='+DAY+'&data_fim='+DAY+'&limit=1&offset=1',headers=dh).json()
     assert page['total']==3 and len(page['items'])==1
-    assert client.get('/motorista/historico?data_inicio=2026-01-01&data_fim='+DAY,headers=dh).status_code==422
+    six_month_start=(date.fromisoformat(DAY)-timedelta(days=183)).isoformat()
+    assert client.get('/motorista/historico?data_inicio='+six_month_start+'&data_fim='+DAY,headers=dh).json()['total']==3
+    outside_range=(date.fromisoformat(DAY)-timedelta(days=184)).isoformat()
+    assert client.get('/motorista/historico?data_inicio='+outside_range+'&data_fim='+DAY,headers=dh).status_code==422
     assert client.get('/motorista/historico',headers=h).status_code==403
     client.post('/motoristas',headers=login(b),json=DRIVER).raise_for_status()
     foreign=login(b,usuario=DRIVER['login'],senha=DRIVER['senha'])

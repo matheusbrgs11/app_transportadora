@@ -58,8 +58,8 @@ def register_driver_day(app, authenticated):
         zone=conn.execute('SELECT fuso_horario FROM empresas WHERE id=%s',(user['empresa_id'],)).fetchone()['fuso_horario']
         end=data_fim or datetime.now(ZoneInfo(zone)).date()
         start=data_inicio or end-timedelta(days=6)
-        if end<start or (end-start).days>30:
-            raise HTTPException(422,'Escolha um intervalo de até 31 dias.')
+        if end<start or (end-start).days>183:
+            raise HTTPException(422,'Escolha um intervalo de até 184 dias.')
         condition=""" FROM coletas WHERE motorista_id=%s AND
             (coalesce(concluida_em,agendada_para,criado_em) AT TIME ZONE %s)::date BETWEEN %s AND %s"""
         params=(mid,zone,start,end)
