@@ -91,14 +91,20 @@ def complete(conn,user,mid,body,response):
         response.status_code=200
         return {'id':previous['coleta_id'],'status':previous['status']}
     old=conn.execute('''SELECT c.*,e.rota_id,e.planejamento,e.data AS dia,e.fuso_horario FROM coletas c
-        JOIN execucoes_rotas e ON e.id=c.execucao_id AND e.empresa_id=c.empresa_id
+        LEFT JOIN execucoes_rotas e ON e.id=c.execucao_id AND e.empresa_id=c.empresa_id
         WHERE c.id=%s AND c.motorista_id=%s FOR UPDATE OF c''',(body.coleta_id,mid)).fetchone()
     if not old:
         raise HTTPException(404,'Atendimento não encontrado.')
-    if old['rota_id']!=body.rota_id or old['cliente_id']!=body.cliente_id or old['planejamento']['versao']!=body.versao_rota:
-        raise HTTPException(409,'Dados não correspondem ao atendimento planejado.')
-    if body.concluida_em.astimezone(ZoneInfo(old['fuso_horario'])).date()!=old['dia']:
-        raise HTTPException(422,'A realização deve pertencer ao dia do atendimento.')
+    call=None
+    if old['origem']=='chamado_imprevisto':
+        call=conn.execute('SELECT * FROM chamados_imprevistos WHERE coleta_id=%s FOR UPDATE',(body.coleta_id,)).fetchone()
+        if not call or call['estado']!='aceito' or call['id']!=body.rota_id or body.versao_rota!=1 or old['cliente_id']!=body.cliente_id:
+            raise HTTPException(409,'Chamado alterado. Atualize a rota antes de enviar.')
+    else:
+        if old['rota_id']!=body.rota_id or old['cliente_id']!=body.cliente_id or old['planejamento']['versao']!=body.versao_rota:
+            raise HTTPException(409,'Dados não correspondem ao atendimento planejado.')
+        if body.concluida_em.astimezone(ZoneInfo(old['fuso_horario'])).date()!=old['dia']:
+            raise HTTPException(422,'A realização deve pertencer ao dia do atendimento.')
     if old['status']!='agendada':
         raise HTTPException(409,'Atendimento já finalizado. Atualize sua rota; não crie outra visita.')
     if body.status=='concluida':
@@ -116,6 +122,9 @@ def complete(conn,user,mid,body,response):
                 (user['empresa_id'],old['id'],item.modalidade_id,names[item.modalidade_id],item.quantidade,item.quantidade_status))
     conn.execute("UPDATE coletas SET status=%s,concluida_em=%s,observacoes=%s,versao=versao+1 WHERE id=%s",
                  (body.status,body.concluida_em if body.status=='concluida' else None,body.observacoes,old['id']))
+    if call:
+        conn.execute('''UPDATE chamados_imprevistos SET estado=%s,versao=versao+1,atualizado_em=now() WHERE id=%s''',
+                     ('concluido' if body.status=='concluida' else 'nao_atendido',call['id']))
     if body.comprovante:
         from .proofs import save_proof
         save_proof(conn,user,old,body,names)

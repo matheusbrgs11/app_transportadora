@@ -9,6 +9,7 @@ from .models import StrictModel
 from .proofs import Proof
 from .daily import prepare, display, complete, route_lock
 from .collections import CollectionCreate, Item, create_collection
+from .calls import expire_calls
 
 
 class DriverVisit(StrictModel):
@@ -130,6 +131,21 @@ def register_driver_day(app, authenticated):
         runs=conn.execute('''SELECT e.* FROM execucoes_rotas e WHERE e.data=%s AND EXISTS
             (SELECT 1 FROM coletas c WHERE c.execucao_id=e.id AND c.motorista_id=%s) ORDER BY e.rota_id''',(day,mid)).fetchall()
         plans=[display(conn,run,mid) for run in runs]
+        expire_calls(conn,user)
+        calls=conn.execute('''SELECT h.id AS chamado_id,h.estado AS chamado_estado,h.versao AS chamado_versao,
+            h.prioridade,h.prazo,c.id AS coleta_id,c.cliente_id,c.status,c.tentativa,
+            cl.nome,cl.endereco,cl.numero,cl.complemento,cl.bairro,cl.cidade,cl.estado,
+            cl.cep,cl.telefone,cl.localizacao_confirmada,
+            ST_Y(cl.localizacao::geometry) AS latitude,ST_X(cl.localizacao::geometry) AS longitude
+            FROM chamados_imprevistos h JOIN coletas c ON c.id=h.coleta_id
+            JOIN clientes cl ON cl.id=c.cliente_id AND cl.empresa_id=c.empresa_id
+            WHERE h.motorista_id=%s AND h.estado IN ('enviado','aceito')
+            ORDER BY h.prioridade DESC,h.prazo,h.id''',(mid,)).fetchall()
+        for call in calls:
+            plans.insert(0,{'id':call['chamado_id'],'nome':'Coleta imprevista',
+                'versao':1,'paradas':[{**call,'ordem':1}],
+                'progresso':{'agendada':1,'concluida':0,'nao_atendida':0,'cancelada':0},
+                'chamado_id':call['chamado_id']})
         return {'data':day,'fuso_horario':zone,'rotas':plans,'total_paradas':sum(len(p['paradas']) for p in plans)}
 
     @app.get('/motorista/rota-do-dia' , tags=['Aplicativo do motorista'])

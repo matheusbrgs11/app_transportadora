@@ -1,4 +1,9 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+val productionStore = System.getenv("COLETA_KEYSTORE_FILE")
+val productionStorePassword = System.getenv("COLETA_KEYSTORE_PASSWORD")
+val productionAlias = System.getenv("COLETA_KEY_ALIAS")
+val productionKeyPassword = System.getenv("COLETA_KEY_PASSWORD")
+val productionSigningReady = listOf(productionStore,productionStorePassword,productionAlias,productionKeyPassword).all { !it.isNullOrBlank() }
 android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -14,10 +19,21 @@ android {
         applicationId = "br.com.coleta.motorista"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = (System.getenv("COLETA_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("COLETA_VERSION_NAME") ?: "0.1.0"
+    }
+    signingConfigs {
+        if(productionSigningReady) create("production") {
+            storeFile = file(productionStore!!)
+            storePassword = productionStorePassword
+            keyAlias = productionAlias
+            keyPassword = productionKeyPassword
+        }
     }
     buildTypes {
+        getByName("release") {
+            if(productionSigningReady) signingConfig = signingConfigs.getByName("production")
+        }
         create("usb") {
             initWith(getByName("release"))
             applicationIdSuffix = ".homologacao.usb"

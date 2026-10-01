@@ -55,6 +55,8 @@ class SyncJob: JobService() {
                                 throw e
                             }
                         }.run()
+                        if(!stopped.get() && vault.valid()?.optString("token")==api.token)
+                            runCatching { CallAlerts.check(this,api,owner) }
                         Log.i(TAG,"Sincronização em segundo plano concluída: $sent registro(s).")
                     }
                 } else {

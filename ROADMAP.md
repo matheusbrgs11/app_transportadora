@@ -1,6 +1,6 @@
 # Plano de conclusão do Coleta — versão comercial inicial
 
-Atualizado em 30/09/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
+Atualizado em 01/10/2026. Esta é a lista de referência solicitada pelo usuário para conduzir o projeto até a conclusão. Desenvolvimento retomado por solicitação do usuário em 26/09/2026. Priorizar testes automatizados leves e evidências resumidas.
 
 ## Como seguir este plano
 
@@ -113,7 +113,7 @@ Aceite: endereços do piloto conferidos e navegação para o destino esperado; s
 - [x] Painel com última posição, horário, precisão, estado de conexão e link para Google Maps.
 - [ ] Mapa incorporado com múltiplos motoristas e homologação com Google Cloud.
 - [x] Interromper captura ao encerrar/sair; guardar encerramento offline para retentativa. API rejeita posições de turnos encerrados/expirados e mantém somente a última posição.
-- [ ] Aprovar retenção e automatizar limpeza periódica em produção: atualmente a posição é apagada ao encerrar no servidor ou no próximo acesso ao rastreamento após expiração de 12 horas; não existe limpeza agendada.
+- [ ] Aprovar retenção e ativar/validar limpeza periódica em produção. A rotina e o timer systemd estão implementados e testados localmente para turnos expirados; ainda dependem da hospedagem.
 - [ ] Testar aparelhos reais, economia de bateria, permissão revogada, falta de sinal e app em segundo plano.
 
 Aceite: operação identifica localização e sua atualidade; não há rastreamento fora do turno no fluxo definido; consumo validado no piloto.
@@ -128,11 +128,11 @@ Aceite: operação identifica localização e sua atualidade; não há rastreame
 
 **Dependência:** não exige Google Cloud para o fluxo básico. Notificação remota e teste fora do cabo dependem da infraestrutura externa; o fluxo local pode ser desenvolvido agora.
 
-- [ ] Criar chamado no painel com cliente, modalidade/volume esperado, prioridade e observações.
-- [ ] Sugerir motoristas por posição recente, disponibilidade, veículo e proximidade; calcular trajeto quando necessário.
-- [ ] Despachar para o motorista escolhido e enviar notificação.
-- [ ] Implementar recebimento, aceite/recusa com motivo, expiração, reatribuição e conclusão.
-- [ ] Integrar à lista de atendimentos e histórico como chamado imprevisto, sem duplicação.
+- [x] Criar chamado no painel com cliente, modalidade/volume esperado, prioridade e observações.
+- [x] Sugerir motoristas por turno, posição recente, veículo e distância em linha reta quando o ponto do cliente estiver confirmado. Cálculo de trajeto via Google Maps continua opcional e pendente de projeto Google Cloud.
+- [x] Despachar para o motorista escolhido e avisar localmente no Android por consulta periódica em turno ativo/JobScheduler. Homologação física da notificação e entrega imediata via infraestrutura externa continuam pendentes.
+- [x] Implementar recebimento na rota, aceite/recusa com motivo, expiração agendada, reatribuição e conclusão; backend testado, APK USB atualizada. A operação no aparelho ainda exige teste manual do fluxo novo.
+- [x] Integrar à lista de atendimentos e histórico como chamado imprevisto, com reenvio idempotente testado.
 - [ ] Tratar motorista offline, posição antiga, notificações desativadas e dois operadores editando juntos.
 
 Aceite: chamado sai do painel, é recebido pelo motorista e termina no histórico com responsável e eventos; envio de notificação não é tratado como confirmação de recebimento.
@@ -165,10 +165,10 @@ Aceite: administrador da empresa executa a rotina sem intervenção técnica no 
 - [ ] Gerenciar segredos e permissões mínimas; aplicar limites de login/upload, logs sem credenciais e limpeza de sessões/prévias.
 - [ ] Validar isolamento de empresas em todos os módulos, arquivos, exports e tarefas em segundo plano.
 - [ ] Definir retenção, descarte, acesso aos dados, termos e privacidade com revisão adequada, incluindo localização e assinatura.
-- [ ] Automatizar backups do banco/arquivos e comprovar restauração; definir prazo de recuperação e perda máxima aceitável.
+- [ ] Automatizar backups externos e definir prazo de recuperação e perda máxima aceitável. Scripts locais criam snapshot e restauram em cluster isolado; restauração foi comprovada com as 13 migrações e RLS. Falta configurar armazenamento criptografado e rotina na hospedagem.
 - [ ] Monitorar erros, indisponibilidade, fila e custos; testar alertas e documentar atendimento a incidentes.
-- [ ] Automatizar testes/builds e publicação; adicionar Gradle Wrapper, gestão segura da chave de assinatura, migrações e reversão de versão.
-- [ ] Gerar release Android assinado, definir distribuição e atualização, verificando requisitos vigentes do canal escolhido.
+- [ ] Automatizar testes/builds e publicação/reversão. Gradle Wrapper 8.11.1 e geração de APK comercial reproduzível estão preparados; CI e publicação em servidor ainda dependem da infraestrutura.
+- [ ] Definir distribuição e atualização Android e verificar requisitos do canal escolhido. APK release assinada e verificada localmente; chave fora do Git em `.local/release` requer backup seguro pelo responsável antes da primeira distribuição. A APK ainda não foi homologada com API HTTPS.
 - [ ] Testar carga representativa e crescimento de dados; revisar dependências e corrigir vulnerabilidades relevantes.
 
 Aceite: operação funciona sem computador do desenvolvedor, restauração comprovada, acessos segregados e procedimento reproduzível de publicação/recuperação. Preparativos desta etapa podem ocorrer em paralelo; deve estar pronta antes do piloto com dados reais.
@@ -282,3 +282,7 @@ Validação do perfil agendamento: 55 testes backend aprovados, build web aprova
 - 30/09/2026: concluídos os três ajustes administrativos solicitados. Nome/fuso e modalidades gerenciáveis por administrador; recuperação autônoma por códigos de uso único; CSV/PDF filtrados com totais e proteção CSV; Visão do dia; melhorias de foco, teclado, estados e contraste. Migração 012 aplicada no banco local; provisionamento de empresa por CLI documentado em `docs/gestao-relatorios.md`. Validação: 61 testes backend completos, build do painel, smoke HTTP local de seis endpoints, renderização e leitura de PDF curto, multipágina e com 50 modalidades e inspeção da tela de recuperação em 360 px. APK Android não mudou. Restam as etapas 1/3/5/6/7/9/10 e testes físicos do piloto, sem considerar estes três ajustes pendentes.
 
 - 30/09/2026: etapas abertas do roteiro detalhadas com resultado esperado, execução/verificação e dependências. A ordem prática destaca o que pode ser desenvolvido agora e o que depende de testes no Android, Google Cloud ou hospedagem.
+
+- 01/10/2026: chamados imprevistos implementados no backend, painel e Android; sugestão por posição recente/distância direta, aceite/recusa, reatribuição, expiração, histórico e aviso local de melhor esforço. Migração 013 aplicada no banco local; 65 testes backend, build do painel, testes/lint Android e APK USB aprovados. Atualização USB instalada no Samsung sem apagar dados; app abriu sem crash, mas o fluxo de chamado na tela ainda requer homologação manual. Preparados timer de limpeza, Gradle Wrapper, assinatura comercial, backup e restauração; APK release assinada localmente. Restauração descartável confirmou 13 migrações e RLS. Auditorias das dependências de produção: npm sem avisos; PyJWT atualizado para 2.15.1 após avisos no 2.13.0, auditoria Python sem avisos conhecidos e suíte reaprovada. Publicação HTTPS, Google Cloud, testes físicos restantes e piloto continuam abertos.
+
+- 01/10/2026: mapa simultâneo de posições recentes preparado no painel com Maps JavaScript API e marcadores avançados; sem chave/Map ID, o painel explica a configuração pendente e mantém links individuais. Build do painel aprovado. O Samsung deixou de aparecer no ADB durante a conferência do aviso “servidor inacessível”; a API local respondeu 200, mas o teste USB requer nova conexão e encaminhamento da porta 8000.

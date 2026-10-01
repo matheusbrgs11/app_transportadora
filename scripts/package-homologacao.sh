@@ -4,7 +4,7 @@ coleta_package_root="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ -d "$coleta_package_root/.local/toolchains/jdk-17.0.20.1+1" ]]; then
   source "$coleta_package_root/scripts/android-env.sh"
 fi
-gradle -p "$coleta_package_root/android" --no-daemon --max-workers=2 :app:assembleStaging :app:lintStaging
+"$coleta_package_root/android/gradlew" -p "$coleta_package_root/android" --no-daemon --max-workers=2 :app:assembleStaging :app:lintStaging
 coleta_package_dir="$coleta_package_root/.local/homologacao"
 mkdir -p "$coleta_package_dir"
 cp "$coleta_package_root/android/app/build/outputs/apk/staging/app-staging.apk" "$coleta_package_dir/coleta-homologacao.apk"

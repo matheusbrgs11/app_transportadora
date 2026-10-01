@@ -1,7 +1,8 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import type {Api} from './api';
 import {ErrorBox} from './ui';
-type Driver={id:string;nome:string;tipo:string;placa:string;turno_id:string|null;capturada_em:string|null;precisao_metros:number|null;latitude:number|null;longitude:number|null};
+import TrackingMap from './TrackingMap';
+type Driver={id:string;nome:string;tipo:string;placa:string;turno_id:string|null;capturada_em:string|null;precisao_metros:number|null;latitude:number|null;longitude:number|null;situacao:string};
 export default function Tracking({api}:{api:Api}){
  const [rows,setRows]=useState<Driver[]>([]),[error,setError]=useState(''),[now,setNow]=useState(Date.now()),[loaded,setLoaded]=useState(false);
  useEffect(()=>{
@@ -17,7 +18,10 @@ export default function Tracking({api}:{api:Api}){
   document.addEventListener('visibilitychange',refresh);
   return()=>{stopped=true;controller?.abort();clearInterval(poll);clearInterval(tick);document.removeEventListener('visibilitychange',refresh);};
  },[api]);
+ const mapDrivers=useMemo(()=>error?[]:rows.filter(r=>r.situacao==='recente'&&r.latitude!==null&&r.longitude!==null)
+  .map(r=>({id:r.id,nome:r.nome,latitude:r.latitude!,longitude:r.longitude!})),[rows,error]);
  return <section className="panel"><p>Última posição durante o turno. Atualização do painel a cada 15 segundos; envio do aparelho aproximadamente a cada minuto, sujeito à conexão e ao Android.</p>
+ <TrackingMap drivers={mapDrivers}/>
  <ErrorBox message={error}/>{error&&<p role="status">Sem confirmação atual do servidor. As posições abaixo podem estar desatualizadas.</p>}
  {!loaded&&!error&&<p>Consultando motoristas…</p>}{loaded&&!rows.length&&<p>Nenhum motorista ativo.</p>}
  {rows.map(r=>{const age=r.capturada_em?Math.max(0,Math.floor((now-Date.parse(r.capturada_em))/1000)):null;

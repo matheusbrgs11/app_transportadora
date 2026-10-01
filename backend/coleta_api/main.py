@@ -31,6 +31,7 @@ from .locations import register_locations
 from .tracking import register_tracking
 from .company import register_company
 from .reports import register_reports
+from .calls import register_calls
 
 PASSWORDS = PasswordHash.recommended()
 DUMMY_HASH = PASSWORDS.hash(str(uuid4()))
@@ -318,6 +319,7 @@ def create_app(settings: Settings | None = None):
     register_offline(app,authenticated,staff)
     register_daily(app,staff)
     register_driver_day(app,authenticated)
+    register_calls(app,authenticated,staff)
     register_operations(app,staff,admin,PASSWORDS)
     register_company(app,staff,admin)
     register_reports(app,staff)

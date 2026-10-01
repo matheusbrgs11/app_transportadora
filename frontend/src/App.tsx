@@ -12,13 +12,15 @@ import MyPassword from './MyPassword';
 import RecoveryCodes from './RecoveryCodes';
 import CompanySettings from './CompanySettings';
 import Overview from './Overview';
+import Calls from './Calls';
 
-const pages=[{id:'visao',name:'Visão do dia',icon:LayoutDashboard,caption:'Acompanhe o andamento das coletas.'},{id:'rastreamento',name:'Rastreamento',icon:Truck,caption:'Última posição dos motoristas durante o turno.'},{id:'clientes',name:'Clientes',icon:Users,caption:'Sua base de clientes, em um só lugar.'},{id:'motoristas',name:'Motoristas',icon:Truck,caption:'Quem faz a operação acontecer.'},{id:'rotas',name:'Rotas fixas',icon:RouteIcon,caption:'Organize os caminhos de cada motorista.'},{id:'coletas',name:'Coletas',icon:ClipboardList,caption:'Registre as visitas e consulte o histórico por cliente.'},{id:'usuarios',name:'Acessos',icon:ShieldCheck,caption:'Controle quem pode acessar a operação.'},{id:'empresa',name:'Empresa',icon:Settings2,caption:'Dados da transportadora e modalidades de coleta.'}] as const;
+const pages=[{id:'visao',name:'Visão do dia',icon:LayoutDashboard,caption:'Acompanhe o andamento das coletas.'},{id:'rastreamento',name:'Rastreamento',icon:Truck,caption:'Última posição dos motoristas durante o turno.'},{id:'clientes',name:'Clientes',icon:Users,caption:'Sua base de clientes, em um só lugar.'},{id:'motoristas',name:'Motoristas',icon:Truck,caption:'Quem faz a operação acontecer.'},{id:'rotas',name:'Rotas fixas',icon:RouteIcon,caption:'Organize os caminhos de cada motorista.'},{id:'chamados',name:'Chamados',icon:Package,caption:'Inclua coletas imprevistas na operação.'},{id:'coletas',name:'Coletas',icon:ClipboardList,caption:'Registre as visitas e consulte o histórico por cliente.'},{id:'usuarios',name:'Acessos',icon:ShieldCheck,caption:'Controle quem pode acessar a operação.'},{id:'empresa',name:'Empresa',icon:Settings2,caption:'Dados da transportadora e modalidades de coleta.'}] as const;
 type Page=typeof pages[number]['id'];
 export default function App(){
  const [session,setSession]=useState<{token:string;user:User}|null>(null);
  const [page,setPage]=useState<Page>('visao');
  const [historyClient,setHistoryClient]=useState<Client|null>(null);
+ const [historyCollection,setHistoryCollection]=useState<string|null>(null);
  const [summary,setSummary]=useState<Summary|null>(null);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
@@ -39,7 +41,7 @@ export default function App(){
  return <div className="app-shell"><a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
   <aside className={'sidebar '+(menu?'open':'')}><Brand/><button className="mobile-close icon-button" aria-label="Fechar menu" onClick={()=>setMenu(false)}><X/></button>
    <div className="workspace"><span className="workspace-avatar">{summary?.empresa?.[0]||'T'}</span><div><strong>{summary?.empresa||'Sua transportadora'}</strong><small>Gestão de coletas</small></div></div>
-   <span className="nav-label">OPERAÇÃO</span><nav aria-label="Navegação principal">{visiblePages.map(({id,name,icon:Icon})=><button key={id} className={id===page?'selected':''} aria-current={id===page?'page':undefined} onClick={()=>{setPage(id);setHistoryClient(null);setMenu(false);setError('');}}><Icon size={20}/>{name}{id===page&&<ArrowRight size={16} className="nav-arrow"/>}</button>)}</nav>
+   <span className="nav-label">OPERAÇÃO</span><nav aria-label="Navegação principal">{visiblePages.map(({id,name,icon:Icon})=><button key={id} className={id===page?'selected':''} aria-current={id===page?'page':undefined} onClick={()=>{setPage(id);setHistoryClient(null);setHistoryCollection(null);setMenu(false);setError('');}}><Icon size={20}/>{name}{id===page&&<ArrowRight size={16} className="nav-arrow"/>}</button>)}</nav>
    <div className="sidebar-foot"><div className="account"><span>{session.user.nome[0]}</span><div><strong>{session.user.nome}</strong><small>{session.user.perfil==='admin'?'Administrador':session.user.perfil==='agendamento'?'Agendamento de coletas':'Operador'}</small></div></div><button onClick={()=>{setPasswordOpen(true);setMenu(false);}}>Minha senha</button><button onClick={()=>{setRecoveryOpen(true);setMenu(false);}}>Códigos de recuperação</button><button onClick={logout}><LogOut size={17}/>Sair da conta</button></div>
   </aside>
   <div className="main-shell"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" onClick={()=>setMenu(true)} aria-label="Abrir menu"><Menu/></button><span>Operação</span><span>/</span><strong>{current.name}</strong></div><span className="private-note"><ShieldCheck size={16}/>Área da transportadora</span></header>
@@ -48,10 +50,11 @@ export default function App(){
     <ErrorBox message={error}/>
     {page==='visao'&&<Overview api={api} onCollections={()=>setPage('coletas')}/>}
     {page==='rastreamento'&&<Tracking api={api}/>}
-    {page==='clientes'&&session.user.perfil==='admin'&&<Clients api={api} admin={session.user.perfil==='admin'} changed={changed} onHistory={client=>{setHistoryClient(client);setPage('coletas');}}/>}
+    {page==='clientes'&&session.user.perfil==='admin'&&<Clients api={api} admin={session.user.perfil==='admin'} changed={changed} onHistory={client=>{setHistoryCollection(null);setHistoryClient(client);setPage('coletas');}}/>}
     {page==='motoristas'&&<Drivers api={api} admin={session.user.perfil==='admin'} changed={changed}/>}
     {page==='rotas'&&<Routes api={api} changed={changed}/>}
-    {page==='coletas'&&<Collections api={api} admin={session.user.perfil==='admin'} initialClient={historyClient} changed={changed}/>}
+    {page==='chamados'&&<Calls api={api} onCollection={id=>{setHistoryCollection(id);setPage('coletas');}}/>}
+    {page==='coletas'&&<Collections api={api} admin={session.user.perfil==='admin'} initialClient={historyClient} initialCollectionId={historyCollection} changed={changed}/>}
     {page==='usuarios'&&session.user.perfil==='admin'&&<UserManagement api={api} currentId={session.user.id} changed={changed}/>}
     {page==='empresa'&&session.user.perfil==='admin'&&<CompanySettings api={api} changed={changed}/>}
    </main><footer className="page-footer"><span>Coleta · Gestão de transportadoras</span><span>Planejamento da operação</span></footer>

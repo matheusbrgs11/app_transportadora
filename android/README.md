@@ -1,6 +1,8 @@
-# Android — primeira implementação do motorista
+# Android — aplicativo do motorista
 
-Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sistema. **APK debug compilado; homologação em aparelho pendente.** Java 17, Gradle 8.11.1 e SDK 35 foram configurados localmente em `.local/toolchains`, fora do Git. A compilação não encerra a fase 3.
+Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sistema. A variante USB foi testada no Samsung para coleta, assinatura, histórico, não atendimento e rastreamento; cenários restantes de bateria, rede e chamados imprevistos ainda precisam de homologação física. Java 17 e SDK 35 foram configurados localmente em `.local/toolchains`, fora do Git. Gradle 8.11.1 está fixado no Wrapper versionado. A compilação não encerra a fase 3.
+
+Chamados imprevistos aparecem na rota do dia com aceite/recusa antes da coleta. A notificação local é consultada durante turno ativo e pelo JobScheduler, portanto pode atrasar conforme o Android; abrir o aviso atualiza a rota após desbloquear o aparelho. A conclusão ou não atendimento usa a mesma fila offline e o mesmo histórico das demais coletas.
 
 ## Fluxo implementado no código
 
@@ -15,15 +17,15 @@ Código nativo Kotlin, Android 8+ (API 26), com interface de componentes do sist
 
 ## Compilar sem Android Studio
 
-Requisitos fixados: JDK 17, Gradle 8.11.1, SDK `platforms;android-35` e `build-tools;35.0.0`. Android Gradle Plugin 8.9.2 e Kotlin 2.1.20 estão fixados nos arquivos do projeto. Consulte a [compatibilidade oficial do AGP](https://developer.android.com/build/releases/agp-8-9-0-release-notes).
+Requisitos fixados: JDK 17, SDK `platforms;android-35` e `build-tools;35.0.0`. O Gradle Wrapper baixa a versão 8.11.1; Android Gradle Plugin 8.9.2 e Kotlin 2.1.20 estão fixados nos arquivos do projeto. Consulte a [compatibilidade oficial do AGP](https://developer.android.com/build/releases/agp-8-9-0-release-notes).
 
-Instale as ferramentas de linha de comando oficiais, configure `ANDROID_HOME` e o PATH de Java/Gradle e execute:
+Instale as ferramentas de linha de comando oficiais, configure `ANDROID_HOME` e JDK 17 e execute:
 
 ```bash
 ./build-debug.sh
 ```
 
-Na máquina configurada, o script carrega automaticamente `scripts/android-env.sh`. Em outra máquina, instale as ferramentas e configure o ambiente. O script compila e executa lint; o APK esperado é `app/build/outputs/apk/debug/app-debug.apk`. Não há Gradle Wrapper incluído nesta versão; o script usa Gradle instalado no PATH.
+Na máquina configurada, o script carrega automaticamente `scripts/android-env.sh`. Em outra máquina, instale as ferramentas e configure o ambiente. O script compila e executa lint; o APK esperado é `app/build/outputs/apk/debug/app-debug.apk`. A versão comercial assinada é gerada por `../scripts/package-release.sh` com chave mantida fora do repositório.
 
 Com telefone conectado por USB, depuração autorizada e platform-tools instalados:
 

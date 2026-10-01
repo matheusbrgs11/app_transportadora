@@ -30,6 +30,7 @@ class TrackingService: Service(),LocationListener {
     private lateinit var store:Store
     private var owner=""
     private var lastAttempt=0L
+    private var lastCallPoll=0L
     private var interval=60_000L
     @Volatile private var stopped=false
     companion object {
@@ -46,6 +47,14 @@ class TrackingService: Service(),LocationListener {
                 ApiTime.parse(t.getString("expira_em"))<=Instant.now()||
                 checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
                 stopTracking();return
+            }
+            val now=SystemClock.elapsedRealtime()
+            if(now-lastCallPoll>=60_000) {
+                lastCallPoll=now
+                executor.execute {
+                    if(!stopped)runCatching { CallAlerts.check(this@TrackingService,
+                        Api(s.getString("base"),s.getString("token")),owner) }
+                }
             }
             handler.postDelayed(this,15_000)
         }

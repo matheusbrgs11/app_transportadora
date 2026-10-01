@@ -20,7 +20,7 @@ const localNow=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezone
 const volumesPayload=(volumes:Volume[])=>volumes.map(v=>({...v,quantidade:v.quantidade===''?null:Number(v.quantidade)}));
 function CollectionBadge({value}:{value:string}){return <span className={'badge '+(value==='concluida'?'green':value==='agendada'?'blue':'gray')}>{statuses[value]}</span>;}
 
-export default function Collections({api,admin,initialClient,changed}:{api:Api;admin:boolean;initialClient:Client|null;changed:(message:string)=>void}){
+export default function Collections({api,admin,initialClient,initialCollectionId,changed}:{api:Api;admin:boolean;initialClient:Client|null;initialCollectionId?:string|null;changed:(message:string)=>void}){
  const [conflicts,setConflicts]=useState(false);
  const [selectedClient,setSelectedClient]=useState<Client|null>(initialClient);const [mods,setMods]=useState<Modality[]>([]);const [drivers,setDrivers]=useState<Driver[]>([]);
  const [filters,setFilters]=useState({data_inicio:'',data_fim:'',motorista_id:'',modalidade_id:'',status:'',origem:'',quantidade_status:''});
@@ -30,6 +30,7 @@ export default function Collections({api,admin,initialClient,changed}:{api:Api;a
  useEffect(()=>{const ctrl=new AbortController();setLoading(true);const params=new URLSearchParams({limit:'20',offset:String(page*20)});for(const [key,val] of Object.entries(filters))if(val)params.set(key,val);if(selectedClient)params.set('cliente_id',selectedClient.id);api<History>('/coletas?'+params,{signal:ctrl.signal}).then(result=>{setData(result);setError('');}).catch(e=>{if(e.name!=='AbortError'){setError(e.message);setData(null);}}).finally(()=>{if(!ctrl.signal.aborted)setLoading(false);});return()=>ctrl.abort();},[api,filters,selectedClient,page,revision]);
  const filter=(key:keyof typeof filters,value:string)=>{setFilters(prev=>({...prev,[key]:value}));setPage(0);};
  async function open(id:string){setOpening(true);setError('');try{setDetail(await api<RecordItem>('/coletas/'+id));}catch(e){setError((e as Error).message);}finally{setOpening(false);}}
+ useEffect(()=>{if(initialCollectionId)open(initialCollectionId);},[initialCollectionId]);
  async function exportFile(format:'csv'|'pdf'){
   setExporting(format);setError('');const params=new URLSearchParams();for(const [key,val] of Object.entries(filters))if(val)params.set(key,val);if(selectedClient)params.set('cliente_id',selectedClient.id);
   try{const blob=await api.download(`/coletas/exportar.${format}?${params}`);const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`coletas.${format}`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}

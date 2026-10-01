@@ -24,7 +24,7 @@ r=httpx.get('http://127.0.0.1:8000/health',timeout=5,trust_env=False)
 r.raise_for_status()
 print('API local disponível.')
 PY
-gradle -p "$coleta_usb_root/android" --no-daemon --max-workers=2 :app:assembleUsb :app:lintUsb
+"$coleta_usb_root/android/gradlew" -p "$coleta_usb_root/android" --no-daemon --max-workers=2 :app:assembleUsb :app:lintUsb
 adb -s "$coleta_usb_serial" reverse tcp:8000 tcp:8000
 # No uninstall, data clearing, automatic permission grants or downgrades.
 adb -s "$coleta_usb_serial" install -r "$coleta_usb_root/android/app/build/outputs/apk/usb/app-usb.apk"

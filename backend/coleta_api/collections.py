@@ -269,6 +269,10 @@ def register_collections(app,staff,admin):
                     WHERE coleta_id=%s AND modalidade_id=%s''',(item.quantidade,item.quantidade_status,coleta_id,item.modalidade_id))
         conn.execute('UPDATE coletas SET status=%s,concluida_em=%s,versao=versao+1 WHERE id=%s',
                      (body.status,body.concluida_em,coleta_id))
+        if old['origem']=='chamado_imprevisto':
+            conn.execute('''UPDATE chamados_imprevistos SET estado=%s,versao=versao+1,
+                atualizado_em=now() WHERE coleta_id=%s''',
+                ({'concluida':'concluido','cancelada':'cancelado','nao_atendida':'nao_atendido'}[body.status],coleta_id))
         add_event(conn,user,coleta_id,old['status'],body.status,body.motivo,body.model_dump(mode='json'))
         return collection_detail(conn,coleta_id)
 

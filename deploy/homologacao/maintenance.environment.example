@@ -1,0 +1,4 @@
+# Instalar como /etc/coleta/manutencao.env, permissão 0600, fora do Git.
+# ADMIN_DATABASE_URL lê somente a lista de empresas; não é usado nas alterações operacionais.
+ADMIN_DATABASE_URL=postgresql://REPLACE_ADMIN_USER:REPLACE_PASSWORD@REPLACE_HOST:5432/REPLACE_DATABASE?sslmode=verify-full
+DATABASE_URL=postgresql://REPLACE_RUNTIME_USER:REPLACE_PASSWORD@REPLACE_HOST:5432/REPLACE_DATABASE?sslmode=verify-full

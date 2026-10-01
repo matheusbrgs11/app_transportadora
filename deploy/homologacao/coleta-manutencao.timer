@@ -1,0 +1,11 @@
+[Unit]
+Description=Coleta - manutenção a cada cinco minutos
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=coleta-manutencao.service
+
+[Install]
+WantedBy=timers.target

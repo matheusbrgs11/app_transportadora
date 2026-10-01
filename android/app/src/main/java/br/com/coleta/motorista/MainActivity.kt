@@ -52,6 +52,11 @@ class MainActivity : Activity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         if (vault.valid()!=null) unlockSaved() else login()
     }
+    override fun onNewIntent(intent:Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if(intent.action=="OPEN_CALLS" && api!=null && !busy) { intent.action=null;refresh() }
+    }
     @Suppress("DEPRECATION")
     private fun unlockSaved() {
         page("Desbloquear acesso salvo")
@@ -70,6 +75,7 @@ class MainActivity : Activity() {
             if(saved==null) { login();return }
             session=saved;owner=saved.getString("owner");api=Api(saved.getString("base"),saved.getString("token"))
             day=store.cached(owner);scheduleSync();home()
+            if(intent?.action=="OPEN_CALLS") { intent.action=null;refresh() }
         }
     }
     private fun sessionAllowed(): Boolean {
@@ -357,6 +363,7 @@ class MainActivity : Activity() {
             val stops = route.getJSONArray("paradas")
             for (s in 0 until stops.length()) {
                 val stop = stops.getJSONObject(s)
+                val waitingCall=stop.optString("chamado_estado")=="enviado"
                 val existing = records.lastOrNull {
                     val b=it.getJSONObject("body")
                     if (!b.isNull("coleta_id") && !stop.isNull("coleta_id")) b.getString("coleta_id")==stop.getString("coleta_id")
@@ -372,10 +379,25 @@ class MainActivity : Activity() {
                         remoteStatus!="agendada" -> "Não atendida"
                         existing?.optString("state")=="sent" -> "Enviada"
                         existing!=null -> "Salva no aparelho • aguardando envio"
+                        waitingCall -> "Chamado imprevisto • confirme se pode atender"
                         else -> "Próxima coleta"
                     }
                     hint("$status · tentativa ${stop.optInt("tentativa",1)}")
-                    if(remoteStatus=="agendada" && existing==null && current) {
+                    if(waitingCall && current) {
+                        hint("${if(stop.optString("prioridade")=="urgente") "URGENTE · " else ""}Prazo: ${stop.optString("prazo")}")
+                        button("Aceitar chamado") { respondCall(stop,true,null) }
+                        secondaryButton("Recusar chamado") {
+                            val input=EditText(this@MainActivity).apply { hint="Informe o motivo" }
+                            AlertDialog.Builder(this@MainActivity).setTitle("Recusar chamado")
+                                .setView(input).setNegativeButton("Voltar",null)
+                                .setPositiveButton("Recusar") { _,_ ->
+                                    val reason=input.text.toString().trim()
+                                    if(reason.isEmpty()) message("Informe o motivo da recusa.")
+                                    else respondCall(stop,false,reason)
+                                }.show()
+                        }
+                    }
+                    if(remoteStatus=="agendada" && !waitingCall && existing==null && current) {
                         button("Realizar coleta") { visit(plan,route,stop) }
                         secondaryButton("Não foi possível atender") { notAttended(plan,route,stop) }
                     }
@@ -383,6 +405,14 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+    private fun respondCall(stop:JSONObject,accept:Boolean,reason:String?) {
+        val service=api ?: return
+        background({
+            service.request("/motorista/chamados/${stop.getString("chamado_id")}/responder",
+                JSONObject().put("versao",stop.getInt("chamado_versao"))
+                    .put("aceitar",accept).put("motivo",reason ?: JSONObject.NULL))
+        },{refresh()})
     }
     private fun clients() {
         page("Clientes da rota",Tab.CLIENTES)
